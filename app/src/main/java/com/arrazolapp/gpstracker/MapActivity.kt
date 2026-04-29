@@ -40,10 +40,7 @@ class MapActivity : AppCompatActivity() {
         setContentView(R.layout.activity_map)
 
         webMap = findViewById(R.id.webMap)
-        val btnBack = findViewById<ImageView>(R.id.btnBack)
-        val btnTheme = findViewById<Button>(R.id.btnTheme)
-
-        btnBack.setOnClickListener { finish() }
+        // Top bar removido — el menú hamburguesa está dentro del HTML
         btnTheme.setOnClickListener {
             isDark = !isDark
             webMap.evaluateJavascript("toggleTheme()", null)
@@ -86,6 +83,11 @@ class MapActivity : AppCompatActivity() {
 
         // ── NUEVO: JavascriptInterface para abrir apps externas ──
         webMap.addJavascriptInterface(object : Any() {
+            @JavascriptInterface
+            fun goBack() {
+                runOnUiThread { finish() }
+            }
+
             @JavascriptInterface
             fun openWaze(lat: Double, lng: Double) {
                 runOnUiThread {

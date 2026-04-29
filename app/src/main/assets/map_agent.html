@@ -19,13 +19,18 @@ body{background:#1b2433}
 
 /* ── FABs DERECHA (círculos negros Waze) ── */
 .fab-col{position:fixed;top:16px;right:14px;z-index:800;display:flex;flex-direction:column;gap:10px}
+.fab-menu{position:fixed;top:16px;left:14px;z-index:800;width:52px;height:52px;border-radius:14px;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);border:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
+.fab-menu span{width:20px;height:2.5px;background:white;border-radius:2px;display:block}
+.light .fab-menu{background:rgba(255,255,255,0.95);box-shadow:0 2px 10px rgba(0,0,0,0.15)}
+.light .fab-menu span{background:#222}
 .fab{width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
 .fab svg{width:26px;height:26px}
-.fab-alert{position:fixed;bottom:185px;right:14px;z-index:800;width:50px;height:50px;border-radius:50%;background:#f5a623;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.3)}
-.fab-alert svg{width:28px;height:28px}
+.fab-alert{position:fixed;bottom:185px;right:14px;z-index:800;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 14px rgba(0,0,0,0.25)}
+.fab-alert svg{width:34px;height:34px}
+.dark .fab-alert{background:rgba(40,44,56,0.95)}
 
 /* ── VELOCÍMETRO ── */
-.speedometer{position:fixed;bottom:145px;left:14px;z-index:800;width:72px;height:72px;border-radius:50%;background:rgba(30,36,50,0.94);backdrop-filter:blur(8px);border:2.5px solid rgba(255,255,255,0.1);display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 2px 14px rgba(0,0,0,0.5)}
+.speedometer{position:fixed;bottom:185px;left:14px;z-index:800;width:72px;height:72px;border-radius:50%;background:rgba(30,36,50,0.94);backdrop-filter:blur(8px);border:2.5px solid rgba(255,255,255,0.1);display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 2px 14px rgba(0,0,0,0.5)}
 .speed-val{font-size:27px;font-weight:900;color:white;line-height:1}
 .speed-unit{font-size:8px;color:rgba(255,255,255,0.45);font-weight:700;letter-spacing:1.5px;margin-top:1px}
 
@@ -51,9 +56,13 @@ body{background:#1b2433}
 .search-input::placeholder{color:rgba(255,255,255,0.32)}
 .sm{color:rgba(255,255,255,0.38);font-size:19px;cursor:pointer}
 .quick-tabs{display:flex;gap:8px;margin-top:10px}
-.qt{flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.05);border-radius:13px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
-.qt-ic{font-size:19px}
-.qt-lb{font-size:11px;color:rgba(255,255,255,0.55);font-weight:600}
+.qt{flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:11px 8px;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+.qt-ic{font-size:18px;line-height:1}
+.qt-lb{font-size:13px;color:rgba(255,255,255,0.75);font-weight:700}
+.light .qt{background:rgba(0,0,0,0.04);border-color:rgba(0,0,0,0.07)}
+.light .qt-lb{color:#333}
+.qt-new .qt-lb{color:#4a90d9;font-weight:700}
+.light .qt-new .qt-lb{color:#4a90d9}
 .results-list{max-height:210px;overflow-y:auto}
 .results-list::-webkit-scrollbar{display:none}
 .result-row{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer}
@@ -105,10 +114,12 @@ body{background:#1b2433}
 
 /* ── LIGHT MODE ── */
 body.light{background:#e8e0d5}
-.light .speedometer{background:rgba(255,255,255,0.92);border-color:rgba(0,0,0,0.07)}
-.light .speed-val{color:#222}
-.light .speed-unit{color:#888}
-.light .fab{background:rgba(255,255,255,0.93)}
+.light .speedometer{background:#1a1a1a;border-color:rgba(0,0,0,0.2);box-shadow:0 2px 14px rgba(0,0,0,0.35)}
+.light .speed-val{color:white}
+.light .speed-unit{color:rgba(255,255,255,0.5)}
+.light .fab{background:rgba(255,255,255,0.95);box-shadow:0 2px 10px rgba(0,0,0,0.15)}
+.light .fab svg{stroke:#222}
+.light #fabTheme svg{fill:#222}
 .light .search-panel,.light .nav-panel{background:rgba(255,255,255,0.97)}
 .light .sh,.light .nav-row .sh{background:rgba(0,0,0,0.1)}
 .light .search-row{background:rgba(0,0,0,0.04);border-color:rgba(0,0,0,0.06)}
@@ -135,21 +146,22 @@ body.light{background:#e8e0d5}
 <div id="map"></div>
 
 <!-- FABs derecha -->
+<!-- Hamburguesa izquierda (estilo Waze) -->
+<button class="fab-menu" onclick="toggleMenu()">
+  <span></span><span></span><span></span>
+</button>
+
 <div class="fab-col" id="fabCol">
-  <button class="fab" onclick="toggleMenu()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-    </svg>
-  </button>
   <button class="fab" id="fabTheme" onclick="toggleTheme()">
     <svg viewBox="0 0 24 24" fill="white"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
   </button>
 </div>
 
 <div class="fab-alert" onclick="reportAlert()">
-  <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-    <line x1="12" y1="9" x2="12" y2="13"/><circle cx="12" cy="17" r="1" fill="white"/>
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" fill="#f5a623" stroke="#e8940a" stroke-width="0.5"/>
+    <line x1="12" y1="9" x2="12" y2="13" stroke="#1a1a1a" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="12" cy="17" r="1" fill="#1a1a1a"/>
   </svg>
 </div>
 
@@ -184,7 +196,7 @@ body.light{background:#e8e0d5}
     <div class="quick-tabs">
       <div class="qt" onclick="centerOnUser()"><div class="qt-ic">🏠</div><div class="qt-lb">Casa</div></div>
       <div class="qt" onclick="centerOnUser()"><div class="qt-ic">💼</div><div class="qt-lb">Trabajo</div></div>
-      <div class="qt"><div class="qt-ic">＋</div><div class="qt-lb">Nuevo</div></div>
+      <div class="qt qt-new"><div class="qt-ic" style="font-size:15px;font-weight:800;color:#4a90d9">＋</div><div class="qt-lb">Nuevo</div></div>
     </div>
     <div class="results-list" id="resultsList"></div>
   </div>

@@ -317,7 +317,7 @@ class TrackingService : Service() {
         val openPending = PendingIntent.getActivity(this, 0, openIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("📡 Trakio GPS")
+            .setContentTitle("📡 Ubify")
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_notification)
             .setOngoing(true)
@@ -334,7 +334,7 @@ class TrackingService : Service() {
     }
 
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(CHANNEL_ID, "Trakio GPS", NotificationManager.IMPORTANCE_LOW).apply {
+        val channel = NotificationChannel(CHANNEL_ID, "Ubify", NotificationManager.IMPORTANCE_LOW).apply {
             description = "Tracking GPS y control remoto"
             setShowBadge(false)
         }

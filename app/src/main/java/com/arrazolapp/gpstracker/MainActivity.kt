@@ -1,292 +1,232 @@
 package com.arrazolapp.gpstracker
 
-import android.Manifest
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
-import android.content.*
-import android.content.pm.PackageManager
+import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
-import android.provider.Settings
-import android.view.View
-import android.view.animation.AlphaAnimation
-import android.view.animation.Animation
+import android.webkit.*
 import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
-import androidx.appcompat.app.AlertDialog
+import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import com.google.android.gms.location.*
 
-class MainActivity : AppCompatActivity() {
+class MapActivity : AppCompatActivity() {
 
-    private lateinit var btnToggle: Button
-    private lateinit var btnMap: Button
-    private lateinit var tvStatus: TextView
-    private lateinit var tvCoords: TextView
-    private lateinit var tvSpeed: TextView
-    private lateinit var tvBattery: TextView
-    private lateinit var tvUpdates: TextView
-    private lateinit var tvAccuracy: TextView
-    private lateinit var tvAgentName: TextView
-    private lateinit var tvAgentRole: TextView
-    private lateinit var liveContainer: LinearLayout
-    private lateinit var liveDot: View
-    private lateinit var lockMessage: LinearLayout
-
-    private val handler = Handler(Looper.getMainLooper())
-    private var pulseAnim: Animation? = null
+    private lateinit var webMap: WebView
+    private lateinit var fusedClient: FusedLocationProviderClient
+    private var locationCallback: LocationCallback? = null
+    private var isDark = true
 
     private val gpsReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            when (intent.action) {
-                "GPS_UPDATE" -> {
-                    tvCoords.text = "${String.format("%.5f", intent.getDoubleExtra("lat", 0.0))} , ${String.format("%.5f", intent.getDoubleExtra("lng", 0.0))}"
-                    tvSpeed.text = "${intent.getIntExtra("speed", 0)}"
-                    tvBattery.text = "${intent.getIntExtra("battery", 0)}%"
-                    tvUpdates.text = "${intent.getIntExtra("updates", 0)}"
-                    tvAccuracy.text = "${intent.getIntExtra("accuracy", 0)}"
-                }
-                "GPS_STOPPED" -> updateUI()
+            if (intent.action == "GPS_UPDATE") {
+                val lat = intent.getDoubleExtra("lat", 0.0)
+                val lng = intent.getDoubleExtra("lng", 0.0)
+                val accuracy = intent.getIntExtra("accuracy", 20)
+                val speed = intent.getIntExtra("speed", 0)
+                webMap.evaluateJavascript("onGpsUpdate($lat,$lng,$accuracy,${speed/3.6})", null)
             }
         }
     }
 
+    @SuppressLint("SetJavaScriptEnabled", "MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(R.layout.activity_map)
 
-        btnToggle = findViewById(R.id.btnToggle)
-        btnMap = findViewById(R.id.btnMap)
-        tvStatus = findViewById(R.id.tvStatus)
-        tvCoords = findViewById(R.id.tvCoords)
-        tvSpeed = findViewById(R.id.tvSpeed)
-        tvBattery = findViewById(R.id.tvBattery)
-        tvUpdates = findViewById(R.id.tvUpdates)
-        tvAccuracy = findViewById(R.id.tvAccuracy)
-        tvAgentName = findViewById(R.id.tvAgentName)
-        tvAgentRole = findViewById(R.id.tvAgentRole)
-        liveContainer = findViewById(R.id.liveContainer)
-        liveDot = findViewById(R.id.liveDot)
-        lockMessage = findViewById(R.id.lockMessage)
-
-        // Check if configured
-        val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
-        val userId = prefs.getString("userId", "") ?: ""
-
-        if (userId.isEmpty()) {
-            startActivity(Intent(this, SetupActivity::class.java))
-            finish()
-            return
+        webMap = findViewById(R.id.webMap)
+        // Top bar removido — el menú hamburguesa está dentro del HTML
+        btnTheme.setOnClickListener {
+            isDark = !isDark
+            webMap.evaluateJavascript("toggleTheme()", null)
+            btnTheme.text = if (isDark) "🌓" else "☀️"
         }
 
-        // Show agent info
-        tvAgentName.text = prefs.getString("nombre", "Agente")
-        val placa = prefs.getString("placa", "") ?: ""
-        tvAgentRole.text = "${prefs.getString("rol", "")?.uppercase()} ${if (placa.isNotEmpty()) "• $placa" else ""}"
-
-        // Setup pulse animation for EN VIVO dot
-        pulseAnim = AlphaAnimation(1f, 0.3f).apply {
-            duration = 800
-            repeatCount = Animation.INFINITE
-            repeatMode = Animation.REVERSE
+        webMap.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            allowFileAccess = true
+            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            cacheMode = WebSettings.LOAD_NO_CACHE
+            useWideViewPort = true
         }
+        webMap.webChromeClient = WebChromeClient()
 
-        btnToggle.setOnClickListener { toggleTracking() }
-        btnMap.setOnClickListener {
-            startActivity(Intent(this, MapActivity::class.java))
-        }
-
-        checkPermissions()
-        requestBatteryOptimization()
-
-        // Start service in STANDBY mode
-        if (!TrackingService.isRunning) {
-            val intent = Intent(this, TrackingService::class.java).apply {
-                action = TrackingService.ACTION_STANDBY
+        // ── NUEVO: Interceptar URLs externas (Waze, Google Maps, etc.) ──
+        webMap.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
+                val company = prefs.getString("company", "demo_corp") ?: "demo_corp"
+                val userId  = prefs.getString("userId", "") ?: ""
+                val nombre  = prefs.getString("nombre", "Agente") ?: "Agente"
+                webMap.evaluateJavascript("setConfig('$company','$userId','$nombre')", null)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
+
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                val url = request?.url?.toString() ?: return false
+                return handleExternalUrl(url)
+            }
+
+            // Para versiones antiguas de Android
+            @Suppress("DEPRECATION")
+            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                if (url == null) return false
+                return handleExternalUrl(url)
             }
         }
 
-        updateUI()
+        // ── NUEVO: JavascriptInterface para abrir apps externas ──
+        webMap.addJavascriptInterface(object : Any() {
+            @JavascriptInterface
+            fun goBack() {
+                runOnUiThread { finish() }
+            }
+
+            @JavascriptInterface
+            fun openWaze(lat: Double, lng: Double) {
+                runOnUiThread {
+                    // Primero intentar abrir la app nativa de Waze
+                    val wazeUri = Uri.parse("waze://?ll=$lat,$lng&navigate=yes")
+                    val wazeIntent = Intent(Intent.ACTION_VIEW, wazeUri)
+                    if (wazeIntent.resolveActivity(packageManager) != null) {
+                        startActivity(wazeIntent)
+                    } else {
+                        // Si no tiene Waze, abrir en Play Store
+                        val playIntent = Intent(Intent.ACTION_VIEW,
+                            Uri.parse("market://details?id=com.waze"))
+                        startActivity(playIntent)
+                    }
+                }
+            }
+
+            @JavascriptInterface
+            fun openGoogleMaps(lat: Double, lng: Double) {
+                runOnUiThread {
+                    // Intentar abrir Google Maps nativo
+                    val gmmUri = Uri.parse("google.navigation:q=$lat,$lng&mode=d")
+                    val gmmIntent = Intent(Intent.ACTION_VIEW, gmmUri).apply {
+                        setPackage("com.google.android.apps.maps")
+                    }
+                    if (gmmIntent.resolveActivity(packageManager) != null) {
+                        startActivity(gmmIntent)
+                    } else {
+                        // Fallback a navegador
+                        val browserUri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving")
+                        startActivity(Intent(Intent.ACTION_VIEW, browserUri))
+                    }
+                }
+            }
+
+            @JavascriptInterface
+            fun fetchRoute(originLat: Double, originLng: Double, destLat: Double, destLng: Double) {
+                // Llamar OSRM desde Kotlin (sin restricción CORS)
+                Thread {
+                    try {
+                        val url = java.net.URL(
+                            "https://router.project-osrm.org/route/v1/driving/" +
+                            "$originLng,$originLat;$destLng,$destLat" +
+                            "?overview=full&geometries=geojson"
+                        )
+                        val conn = url.openConnection() as java.net.HttpURLConnection
+                        conn.connectTimeout = 8000
+                        conn.readTimeout = 8000
+                        val json = conn.inputStream.bufferedReader().readText()
+                        conn.disconnect()
+                        // Devolver resultado al JS en el hilo principal
+                        runOnUiThread {
+                            // Pasar JSON via variable JS para evitar problemas de escape
+                            val jsCode = "window._routeJson = " + json + "; onRouteResultFromAndroid();"
+                            webMap.evaluateJavascript(jsCode, null)
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread {
+                            webMap.evaluateJavascript("onRouteError()", null)
+                        }
+                    }
+                }.start()
+            }
+        }, "Android")
+
+        webMap.loadUrl("file:///android_asset/map_agent.html")
+
+        fusedClient = LocationServices.getFusedLocationProviderClient(this)
+        val locReq = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3000)
+            .setMinUpdateIntervalMillis(2000)
+            .build()
+
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                val loc = result.lastLocation ?: return
+                val bearing = if (loc.hasBearing()) loc.bearing else 0f
+                val speed   = if (loc.hasSpeed()) loc.speed else 0f
+                webMap.evaluateJavascript(
+                    "updateUserPosition(${loc.latitude},${loc.longitude},${loc.accuracy.toInt()},$speed,$bearing)", null
+                )
+            }
+        }
+
+        try {
+            fusedClient.requestLocationUpdates(locReq, locationCallback!!, Looper.getMainLooper())
+        } catch (e: SecurityException) {}
+    }
+
+    private fun handleExternalUrl(url: String): Boolean {
+        return when {
+            url.startsWith("waze://") || url.startsWith("https://waze.com") || url.startsWith("https://www.waze.com") -> {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.waze")))
+                }
+                true
+            }
+            url.startsWith("google.navigation:") || (url.contains("google.com/maps") && !url.startsWith("file://")) -> {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    startActivity(intent)
+                } catch (e: Exception) {}
+                true
+            }
+            url.startsWith("http://") || url.startsWith("https://") -> {
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                } catch (e: Exception) {}
+                true
+            }
+            url.startsWith("file://") -> false  // Dejar que el WebView lo maneje
+            else -> {
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                } catch (e: Exception) {}
+                true
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        val filter = IntentFilter().apply {
-            addAction("GPS_UPDATE")
-            addAction("GPS_STOPPED")
-        }
+        val filter = IntentFilter("GPS_UPDATE")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(gpsReceiver, filter, RECEIVER_EXPORTED)
         } else {
             registerReceiver(gpsReceiver, filter)
         }
-        updateUI()
-        tvBattery.text = "${getBatteryLevel()}%"
-
-        // Periodic UI update (for remote start/stop)
-        val uiUpdater = object : Runnable {
-            override fun run() {
-                if (!isFinishing) {
-                    updateUI()
-                    handler.postDelayed(this, 2000)
-                }
-            }
-        }
-        handler.postDelayed(uiUpdater, 2000)
     }
 
     override fun onPause() {
         super.onPause()
         try { unregisterReceiver(gpsReceiver) } catch (e: Exception) {}
-        handler.removeCallbacksAndMessages(null)
     }
 
-    private fun toggleTracking() {
-        if (TrackingService.isTracking) {
-            // Check if admin locked stop
-            val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
-            val allowStop = prefs.getBoolean("allowStop", true)
-            if (!allowStop) {
-                AlertDialog.Builder(this)
-                    .setTitle("🔒 Modo Supervisado")
-                    .setMessage("El tracking está en modo supervisado.\n\nSolo tu administrador puede detenerlo. Contactalo si tenés dudas.")
-                    .setPositiveButton("Entendido", null)
-                    .show()
-                return
-            }
-            startService(Intent(this, TrackingService::class.java).apply {
-                action = TrackingService.ACTION_STOP
-            })
-        } else {
-            if (!hasLocationPermission()) { checkPermissions(); return }
-            val intent = Intent(this, TrackingService::class.java).apply {
-                action = TrackingService.ACTION_START
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
-        }
-        handler.postDelayed({ updateUI() }, 500)
-    }
-
-    private fun updateUI() {
-        val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
-        val allowStop = prefs.getBoolean("allowStop", true)
-
-        if (TrackingService.isTracking) {
-            // ── GPS ACTIVE ──
-            liveContainer.visibility = View.VISIBLE
-            liveDot.startAnimation(pulseAnim)
-
-            tvStatus.text = if (!allowStop) "GPS TRANSMITIENDO (SUPERVISADO)" else "GPS TRANSMITIENDO"
-            tvStatus.setTextColor(ContextCompat.getColor(this, R.color.green))
-
-            if (!allowStop) {
-                // LOCKED mode
-                btnToggle.text = "🔒  MODO SUPERVISADO"
-                btnToggle.setBackgroundColor(ContextCompat.getColor(this, R.color.gris_oscuro))
-                lockMessage.visibility = View.VISIBLE
-            } else {
-                btnToggle.text = "⏹  DETENER TRACKING"
-                btnToggle.setBackgroundColor(ContextCompat.getColor(this, R.color.red))
-                lockMessage.visibility = View.GONE
-            }
-        } else {
-            // ── GPS INACTIVE ──
-            liveContainer.visibility = View.GONE
-            liveDot.clearAnimation()
-            lockMessage.visibility = View.GONE
-
-            btnToggle.text = "▶  INICIAR TRACKING"
-            btnToggle.setBackgroundColor(ContextCompat.getColor(this, R.color.naranja))
-
-            tvStatus.text = if (TrackingService.isRunning) "CONECTADO — ESPERANDO" else "GPS DESACTIVADO"
-            tvStatus.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray))
-
-            tvCoords.text = "--.----- , ---.-----"
-            tvSpeed.text = "0"
-            tvUpdates.text = "0"
-            tvAccuracy.text = "--"
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // PERMISSIONS
-    // ═══════════════════════════════════════════════════════════
-    private fun hasLocationPermission() =
-        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
-    private fun checkPermissions() {
-        val perms = mutableListOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            perms.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        val needed = perms.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
-        if (needed.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, needed.toTypedArray(), 100)
-        } else {
-            requestBackgroundLocation()
-        }
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 100 && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-            requestBackgroundLocation()
-        }
-    }
-
-    private fun requestBackgroundLocation() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                AlertDialog.Builder(this)
-                    .setTitle("Ubicación en segundo plano")
-                    .setMessage("Para que el tracking funcione con la app cerrada, seleccioná \"Permitir siempre\" en el siguiente diálogo.")
-                    .setPositiveButton("Entendido") { _, _ ->
-                        ActivityCompat.requestPermissions(this,
-                            arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION), 200)
-                    }
-                    .show()
-            }
-        }
-    }
-
-    private fun requestBatteryOptimization() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val pm = getSystemService(POWER_SERVICE) as PowerManager
-            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-                AlertDialog.Builder(this)
-                    .setTitle("Optimización de batería")
-                    .setMessage("Para que el GPS funcione siempre, desactivá la optimización de batería para esta app.")
-                    .setPositiveButton("Configurar") { _, _ ->
-                        startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                            data = Uri.parse("package:$packageName")
-                        })
-                    }
-                    .setNegativeButton("Después", null)
-                    .show()
-            }
-        }
-    }
-
-    private fun getBatteryLevel(): Int {
-        val bm = getSystemService(BATTERY_SERVICE) as android.os.BatteryManager
-        return bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    override fun onDestroy() {
+        super.onDestroy()
+        locationCallback?.let { fusedClient.removeLocationUpdates(it) }
     }
 }

@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "931177352455",
+    "firebase_url": "https://tracking-gps-arrazolapp-default-rtdb.firebaseio.com",
+    "project_id": "tracking-gps-arrazolapp",
+    "storage_bucket": "tracking-gps-arrazolapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:931177352455:android:669547541fed51f14689a2",
+        "android_client_info": {
+          "package_name": "com.arrazolapp.gpstracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBLVpZ-Upu2N9gsD5KWCXc6NtWttYdvjk4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,2 @@
+rootProject.name = "ArrazolApp GPS Tracker"
+include ':app'

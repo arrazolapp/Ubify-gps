@@ -1,0 +1,367 @@
+package com.arrazolapp.gpstracker
+
+import android.app.*
+import android.content.Context
+import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.*
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.google.android.gms.location.*
+import com.google.firebase.database.*
+import java.text.SimpleDateFormat
+import java.util.*
+import kotlin.math.*
+
+class TrackingService : Service() {
+
+    companion object {
+        const val TAG = "TrackingService"
+        const val CHANNEL_ID = "gps_tracking_channel"
+        const val NOTIFICATION_ID = 1001
+        const val ACTION_START = "ACTION_START"
+        const val ACTION_STOP = "ACTION_STOP"
+        const val ACTION_STANDBY = "ACTION_STANDBY"
+
+        var isRunning = false
+            private set
+        var isTracking = false
+            private set
+    }
+
+    private lateinit var fusedClient: FusedLocationProviderClient
+    private var locationCallback: LocationCallback? = null
+    private var controlListener: ValueEventListener? = null
+    private var controlRef: DatabaseReference? = null
+
+    // ── Gestor de visitas a clientes ──
+    private lateinit var visitaManager: VisitaManager
+
+    private var updateCount = 0
+    private var totalDistance = 0.0
+    private var stopCount = 0
+    private var lastLat = 0.0
+    private var lastLng = 0.0
+    private var lastSpeed = 0
+    private var lastWasMoving = false
+
+    override fun onCreate() {
+        super.onCreate()
+        fusedClient = LocationServices.getFusedLocationProviderClient(this)
+        visitaManager = VisitaManager(this)
+        createNotificationChannel()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_STOP -> {
+                stopGPS()
+                return START_STICKY
+            }
+            ACTION_START -> {
+                startGPS()
+                return START_STICKY
+            }
+            ACTION_STANDBY -> {
+                startStandby()
+                return START_STICKY
+            }
+            else -> {
+                if (!isRunning) startStandby()
+                return START_STICKY
+            }
+        }
+    }
+
+    private fun startStandby() {
+        if (isRunning && !isTracking) return
+
+        isRunning = true
+        isTracking = false
+
+        val notification = buildNotification("Conectado — esperando instrucciones", false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+
+        startCommandListener()
+        Log.d(TAG, "STANDBY activo")
+    }
+
+    private fun startGPS() {
+        isRunning = true
+        isTracking = true
+
+        val notification = buildNotification("Iniciando GPS...", true)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+
+        startCommandListener()
+
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10000)
+            .setMinUpdateIntervalMillis(5000)
+            .setMinUpdateDistanceMeters(5f)
+            .build()
+
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                val location = result.lastLocation ?: return
+                val speedKmh = if (location.hasSpeed()) (location.speed * 3.6).toInt() else 0
+
+                if (lastLat != 0.0 && lastLng != 0.0) {
+                    val dist = haversine(lastLat, lastLng, location.latitude, location.longitude)
+                    if (dist > 0.01) totalDistance += dist
+                    if (lastWasMoving && speedKmh < 3) { stopCount++; lastWasMoving = false }
+                    else if (speedKmh >= 3) lastWasMoving = true
+                }
+
+                lastLat = location.latitude
+                lastLng = location.longitude
+                lastSpeed = speedKmh
+                updateCount++
+
+                sendToFirebase(location.latitude, location.longitude, speedKmh)
+
+                // ── Detectar visitas a clientes ──
+                val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
+                visitaManager.onLocationUpdate(
+                    lat        = location.latitude,
+                    lng        = location.longitude,
+                    companyId  = prefs.getString("company", "demo_corp") ?: "demo_corp",
+                    agenteName = prefs.getString("nombre", "Agente") ?: "Agente",
+                    agenteRol  = prefs.getString("rol", "vendedor") ?: "vendedor",
+                    webhookUrl = prefs.getString("webhookUrl", "") ?: ""
+                )
+
+                val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                nm.notify(NOTIFICATION_ID, buildNotification(
+                    "${location.latitude.f(4)}, ${location.longitude.f(4)} · ${speedKmh} km/h · #$updateCount", true
+                ))
+
+                sendBroadcast(Intent("GPS_UPDATE").apply {
+                    putExtra("lat", location.latitude)
+                    putExtra("lng", location.longitude)
+                    putExtra("speed", speedKmh)
+                    putExtra("accuracy", location.accuracy.toInt())
+                    putExtra("heading", if (location.hasBearing()) location.bearing else 0f)
+                    putExtra("updates", updateCount)
+                    putExtra("distance", totalDistance)
+                    putExtra("stops", stopCount)
+                    putExtra("battery", getBatteryLevel())
+                })
+            }
+        }
+
+        try {
+            fusedClient.requestLocationUpdates(locationRequest, locationCallback!!, Looper.getMainLooper())
+            Log.d(TAG, "GPS tracking iniciado")
+            markOnline()
+
+            // ── Iniciar detección de visitas ──
+            val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
+            val companyId = prefs.getString("company", "demo_corp") ?: "demo_corp"
+            visitaManager.iniciar(companyId)
+
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Sin permisos de GPS", e)
+        }
+    }
+
+    private fun stopGPS() {
+        isTracking = false
+        locationCallback?.let { fusedClient.removeLocationUpdates(it) }
+        locationCallback = null
+
+        // ── Cerrar visita activa si hay una ──
+        val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
+        visitaManager.detener(
+            companyId  = prefs.getString("company", "demo_corp") ?: "demo_corp",
+            agenteName = prefs.getString("nombre", "Agente") ?: "Agente",
+            agenteRol  = prefs.getString("rol", "vendedor") ?: "vendedor",
+            webhookUrl = prefs.getString("webhookUrl", "") ?: ""
+        )
+
+        markOffline()
+        sendBroadcast(Intent("GPS_STOPPED"))
+
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(NOTIFICATION_ID, buildNotification("Conectado — esperando instrucciones", false))
+        Log.d(TAG, "GPS detenido, standby activo")
+    }
+
+    private fun startCommandListener() {
+        if (controlListener != null) return
+
+        val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
+        val companyId = prefs.getString("company", "demo_corp") ?: "demo_corp"
+        val userId = prefs.getString("userId", "") ?: ""
+        if (userId.isEmpty()) return
+
+        controlRef = FirebaseDatabase.getInstance()
+            .getReference("companies/$companyId/controls/$userId")
+
+        controlListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val data = snapshot.value as? Map<*, *> ?: return
+
+                val forceStart = data["forceStart"] as? Boolean ?: false
+                val forceStop = data["forceStop"] as? Boolean ?: false
+                val allowStop = data["allowStop"] as? Boolean ?: true
+                val schedEnabled = data["scheduleEnabled"] as? Boolean ?: false
+                val allowedStart = data["allowedStart"] as? String
+                val allowedEnd = data["allowedEnd"] as? String
+
+                Log.d(TAG, "Comando: start=$forceStart stop=$forceStop allow=$allowStop")
+
+                if (forceStart && !isTracking) {
+                    Log.d(TAG, "Admin: INICIAR")
+                    controlRef?.child("forceStart")?.setValue(false)
+                    if (schedEnabled && allowedStart != null && allowedEnd != null) {
+                        if (!isWithinSchedule(allowedStart, allowedEnd)) return
+                    }
+                    startGPS()
+                }
+
+                if (forceStop && isTracking) {
+                    Log.d(TAG, "Admin: DETENER")
+                    controlRef?.child("forceStop")?.setValue(false)
+                    stopGPS()
+                }
+
+                getSharedPreferences("agent_config", MODE_PRIVATE).edit()
+                    .putBoolean("allowStop", allowStop).apply()
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "Error listener: ${error.message}")
+            }
+        }
+
+        controlRef?.addValueEventListener(controlListener!!)
+        Log.d(TAG, "Firebase listener activo para $userId")
+    }
+
+    private fun sendToFirebase(lat: Double, lng: Double, speed: Int) {
+        val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
+        val companyId = prefs.getString("company", "demo_corp") ?: "demo_corp"
+        val userId = prefs.getString("userId", "") ?: ""
+        if (userId.isEmpty()) return
+
+        val data = hashMapOf<String, Any>(
+            "nombre" to (prefs.getString("nombre", "Agente") ?: "Agente"),
+            "iniciales" to (prefs.getString("iniciales", "AG") ?: "AG"),
+            "rol" to (prefs.getString("rol", "vendedor") ?: "vendedor"),
+            "placa" to (prefs.getString("placa", "") ?: ""),
+            "whatsapp" to (prefs.getString("whatsapp", "") ?: ""),
+            "lat" to lat, "lng" to lng, "speed" to speed,
+            "battery" to getBatteryLevel(),
+            "distancia" to (Math.round(totalDistance * 10.0) / 10.0),
+            "paradas" to stopCount,
+            "status" to if (speed > 3) "moving" else "online",
+            "ubicacion" to "${lat.f(4)}, ${lng.f(4)}",
+            "lastUpdate" to ServerValue.TIMESTAMP
+        )
+
+        val db = FirebaseDatabase.getInstance()
+        db.getReference("companies/$companyId/tracking/$userId").updateChildren(data)
+
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        db.getReference("companies/$companyId/history/$userId/$today").push().setValue(
+            hashMapOf("lat" to lat, "lng" to lng, "speed" to speed,
+                "battery" to getBatteryLevel(), "timestamp" to System.currentTimeMillis())
+        )
+    }
+
+    private fun markOnline() {
+        val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
+        val c = prefs.getString("company", "demo_corp") ?: "demo_corp"
+        val u = prefs.getString("userId", "") ?: ""
+        if (u.isEmpty()) return
+        val ref = FirebaseDatabase.getInstance().getReference("companies/$c/tracking/$u")
+        ref.child("status").setValue("online")
+        ref.child("lastUpdate").setValue(ServerValue.TIMESTAMP)
+        ref.child("status").onDisconnect().setValue("offline")
+        ref.child("speed").onDisconnect().setValue(0)
+        ref.child("lastUpdate").onDisconnect().setValue(ServerValue.TIMESTAMP)
+    }
+
+    private fun markOffline() {
+        val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
+        val c = prefs.getString("company", "demo_corp") ?: "demo_corp"
+        val u = prefs.getString("userId", "") ?: ""
+        if (u.isEmpty()) return
+        val ref = FirebaseDatabase.getInstance().getReference("companies/$c/tracking/$u")
+        ref.child("status").setValue("offline")
+        ref.child("speed").setValue(0)
+        ref.child("lastUpdate").setValue(ServerValue.TIMESTAMP)
+    }
+
+    private fun isWithinSchedule(start: String, end: String): Boolean {
+        return try {
+            val now = Calendar.getInstance()
+            val cur = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+            val s = start.split(":"); val e = end.split(":")
+            cur in (s[0].toInt() * 60 + s[1].toInt())..(e[0].toInt() * 60 + e[1].toInt())
+        } catch (ex: Exception) { true }
+    }
+
+    private fun buildNotification(text: String, showStop: Boolean): Notification {
+        val openIntent = Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_SINGLE_TOP }
+        val openPending = PendingIntent.getActivity(this, 0, openIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("📡 Trakio GPS")
+            .setContentText(text)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setOngoing(true)
+            .setContentIntent(openPending)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(if (showStop) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_MIN)
+
+        if (showStop) {
+            val stopIntent = Intent(this, TrackingService::class.java).apply { action = ACTION_STOP }
+            val stopPending = PendingIntent.getService(this, 1, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            builder.addAction(R.drawable.ic_notification, "Detener", stopPending)
+        }
+        return builder.build()
+    }
+
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(CHANNEL_ID, "Trakio GPS", NotificationManager.IMPORTANCE_LOW).apply {
+            description = "Tracking GPS y control remoto"
+            setShowBadge(false)
+        }
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
+    }
+
+    private fun getBatteryLevel(): Int {
+        val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        return bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    }
+
+    private fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val R = 6371.0; val dLat = Math.toRadians(lat2 - lat1); val dLon = Math.toRadians(lon2 - lon1)
+        val a = sin(dLat / 2).pow(2) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2).pow(2)
+        return R * 2 * atan2(sqrt(a), sqrt(1 - a))
+    }
+
+    private fun Double.f(n: Int) = String.format("%.${n}f", this)
+
+    override fun onDestroy() {
+        super.onDestroy()
+        controlListener?.let { controlRef?.removeEventListener(it) }
+        controlListener = null
+        if (isRunning) {
+            isRunning = false; isTracking = false
+            val i = Intent(this, TrackingService::class.java).apply { action = ACTION_STANDBY }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(i) else startService(i)
+        }
+    }
+}

@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0f0f0f"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:padding="32dp">
+
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@mipmap/ic_launcher"
+            android:layout_marginTop="40dp"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Configurar Agente"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Ingresá los datos que te dio tu supervisor"
+            android:textColor="#888888"
+            android:textSize="14sp"
+            android:layout_marginBottom="32dp" />
+
+        <!-- Empresa -->
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="EMPRESA" android:textColor="@color/naranja" android:textSize="11sp"
+            android:letterSpacing="0.15" android:layout_marginBottom="4dp" />
+        <EditText
+            android:id="@+id/etCompany"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="demo_corp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#555"
+            android:background="@drawable/input_background"
+            android:paddingHorizontal="14dp"
+            android:textSize="14sp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- User ID -->
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="ID DE USUARIO" android:textColor="@color/naranja" android:textSize="11sp"
+            android:letterSpacing="0.15" android:layout_marginBottom="4dp" />
+        <EditText
+            android:id="@+id/etUserId"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Ej: user_juan_abc123"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#555"
+            android:background="@drawable/input_background"
+            android:paddingHorizontal="14dp"
+            android:textSize="14sp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Nombre -->
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="NOMBRE COMPLETO" android:textColor="@color/naranja" android:textSize="11sp"
+            android:letterSpacing="0.15" android:layout_marginBottom="4dp" />
+        <EditText
+            android:id="@+id/etNombre"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Ej: Juan Carlos Arrazola"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#555"
+            android:background="@drawable/input_background"
+            android:paddingHorizontal="14dp"
+            android:textSize="14sp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Rol -->
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="ROL" android:textColor="@color/naranja" android:textSize="11sp"
+            android:letterSpacing="0.15" android:layout_marginBottom="4dp" />
+        <Spinner
+            android:id="@+id/spRol"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/input_background"
+            android:paddingHorizontal="14dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Placa -->
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="PLACA (SOLO TRANSPORTE)" android:textColor="@color/naranja" android:textSize="11sp"
+            android:letterSpacing="0.15" android:layout_marginBottom="4dp" />
+        <EditText
+            android:id="@+id/etPlaca"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Ej: SJO-284"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#555"
+            android:background="@drawable/input_background"
+            android:paddingHorizontal="14dp"
+            android:textSize="14sp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- WhatsApp -->
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="WHATSAPP" android:textColor="@color/naranja" android:textSize="11sp"
+            android:letterSpacing="0.15" android:layout_marginBottom="4dp" />
+        <EditText
+            android:id="@+id/etWhatsapp"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Ej: 50688881234"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#555"
+            android:background="@drawable/input_background"
+            android:paddingHorizontal="14dp"
+            android:inputType="phone"
+            android:textSize="14sp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Separador de sección -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#222222"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="CONFIGURACIÓN DE VISITAS"
+            android:textColor="#f56a00"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.15"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="URL del webhook de Google Apps Script para registrar visitas automáticamente"
+            android:textColor="#888888"
+            android:textSize="12sp"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Webhook URL -->
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="WEBHOOK URL (GOOGLE APPS SCRIPT)"
+            android:textColor="@color/naranja" android:textSize="11sp"
+            android:letterSpacing="0.15" android:layout_marginBottom="4dp" />
+        <EditText
+            android:id="@+id/etWebhook"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:hint="https://script.google.com/macros/s/..."
+            android:textColor="#FFFFFF"
+            android:textColorHint="#555"
+            android:background="@drawable/input_background"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="12dp"
+            android:inputType="textUri"
+            android:textSize="12sp"
+            android:singleLine="false"
+            android:lines="2"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⏱ Tiempo mínimo de visita: 60 segundos"
+            android:textColor="#555555"
+            android:textSize="11sp"
+            android:layout_marginBottom="24dp" />
+
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="💾  GUARDAR Y COMENZAR"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:backgroundTint="@color/naranja" />
+
+    </LinearLayout>
+</ScrollView>

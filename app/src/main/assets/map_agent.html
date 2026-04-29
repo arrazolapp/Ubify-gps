@@ -3,799 +3,498 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Mapa</title>
+<title>Ubify</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#e8e8e8;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
-#map{width:100vw;height:100vh}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,'Segoe UI',system-ui,sans-serif}
+body{background:#1b2433}
+#map{position:fixed;inset:0;z-index:0}
 .leaflet-control-zoom,.leaflet-control-attribution{display:none!important}
 
-/* ── NAV ARROW — cursor fijo, siempre apunta arriba ── */
-.nav-arrow-wrap{width:36px;height:36px;position:relative;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.35));overflow:visible}
-.nav-arrow-svg{width:36px;height:36px;display:block}
-.nav-glow{position:absolute;inset:-10px;border-radius:50%;background:radial-gradient(circle,rgba(0,188,212,0.15) 0%,transparent 68%);animation:navGlow 2s infinite;pointer-events:none}
-@keyframes navGlow{0%,100%{opacity:0.4;transform:scale(1)}50%{opacity:1;transform:scale(1.25)}}
-.accuracy-circle{border-radius:50%;background:rgba(0,188,212,0.06);border:1px solid rgba(0,188,212,0.1)}
+/* ── CURSOR ── */
+.nav-wrap{position:relative;width:40px;height:46px;filter:drop-shadow(0 2px 7px rgba(0,0,0,0.5))}
+.nav-glow{position:absolute;inset:-14px;border-radius:50%;background:radial-gradient(circle,rgba(0,188,212,0.22) 0%,transparent 65%);animation:glow 2s ease-in-out infinite;pointer-events:none}
+@keyframes glow{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.9;transform:scale(1.3)}}
 
-/* ── BOTÓN NORTE / ORIENTACIÓN ── */
-.btn-north{display:none}
+/* ── FABs DERECHA (círculos negros Waze) ── */
+.fab-col{position:fixed;top:16px;right:14px;z-index:800;display:flex;flex-direction:column;gap:10px}
+.fab{width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
+.fab svg{width:26px;height:26px}
+.fab-alert{position:fixed;bottom:185px;right:14px;z-index:800;width:50px;height:50px;border-radius:50%;background:#f5a623;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.3)}
+.fab-alert svg{width:28px;height:28px}
 
+/* ── VELOCÍMETRO ── */
+.speedometer{position:fixed;bottom:145px;left:14px;z-index:800;width:72px;height:72px;border-radius:50%;background:rgba(30,36,50,0.94);backdrop-filter:blur(8px);border:2.5px solid rgba(255,255,255,0.1);display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 2px 14px rgba(0,0,0,0.5)}
+.speed-val{font-size:27px;font-weight:900;color:white;line-height:1}
+.speed-unit{font-size:8px;color:rgba(255,255,255,0.45);font-weight:700;letter-spacing:1.5px;margin-top:1px}
 
-/* Badge informativo */
-.north-badge{position:fixed;top:68px;right:68px;background:rgba(0,0,0,0.72);color:white;font-size:10px;font-weight:700;letter-spacing:1.2px;padding:4px 10px;border-radius:12px;z-index:999;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
-.north-badge.show{opacity:1}
+/* ── BARRA SUPERIOR NAV ── */
+.nav-top{position:fixed;top:0;left:0;right:0;z-index:900;background:#1b2433;display:none}
+.nav-top.active{display:block}
+.nav-top-inner{display:flex;align-items:center;gap:10px;padding:14px 14px 12px}
+.turn-box{background:#4a90d9;border-radius:12px;width:58px;height:58px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:30px;line-height:1}
+.nav-top-info{flex:1;min-width:0}
+.nav-top-dist{font-size:28px;font-weight:900;color:white;line-height:1}
+.nav-top-street{font-size:14px;color:rgba(255,255,255,0.65);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-top-close{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:rgba(255,255,255,0.7);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 
-/* ── TEMA OSCURO para botón norte ── */
+/* ── BARRA INFERIOR ── */
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;z-index:900}
 
+/* Panel búsqueda */
+.search-panel{background:rgba(20,24,33,0.97);backdrop-filter:blur(16px);padding:8px 14px 20px}
+.sh{width:36px;height:4px;background:rgba(255,255,255,0.13);border-radius:2px;margin:0 auto 10px}
+.search-row{display:flex;align-items:center;background:rgba(255,255,255,0.07);border-radius:30px;padding:0 16px;border:1px solid rgba(255,255,255,0.07)}
+.si{color:rgba(255,255,255,0.38);font-size:17px;margin-right:10px}
+.search-input{flex:1;background:none;border:none;color:white;font-size:15px;padding:13px 0;outline:none}
+.search-input::placeholder{color:rgba(255,255,255,0.32)}
+.sm{color:rgba(255,255,255,0.38);font-size:19px;cursor:pointer}
+.quick-tabs{display:flex;gap:8px;margin-top:10px}
+.qt{flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.05);border-radius:13px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+.qt-ic{font-size:19px}
+.qt-lb{font-size:11px;color:rgba(255,255,255,0.55);font-weight:600}
+.results-list{max-height:210px;overflow-y:auto}
+.results-list::-webkit-scrollbar{display:none}
+.result-row{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer}
+.rpin{width:36px;height:36px;border-radius:10px;background:rgba(245,106,0,0.1);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.rinfo{flex:1;min-width:0}
+.rname{font-size:14px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rsub{font-size:11px;color:rgba(255,255,255,0.38);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rdist{font-size:11px;color:#f56a00;font-weight:700;flex-shrink:0}
 
-/* ── SPEED CIRCLE ── */
-.hamburger-btn{position:fixed;top:16px;left:16px;width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,0.95);border:1px solid rgba(0,0,0,0.08);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;z-index:999;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.12)}
-.hamburger-btn span{width:18px;height:2px;background:#222;border-radius:2px;display:block}
-.dark .hamburger-btn{background:rgba(26,29,35,0.95);border-color:rgba(255,255,255,0.1)}
-.dark .hamburger-btn span{background:white}
-.hamburger-menu{position:fixed;top:0;left:0;bottom:0;width:280px;background:white;z-index:1100;display:none;flex-direction:column;box-shadow:4px 0 24px rgba(0,0,0,0.15);animation:menuSlideIn 0.25s ease}
-@keyframes menuSlideIn{from{transform:translateX(-100%)}to{transform:translateX(0)}}
-.hamburger-menu.open{display:flex}
-.hamburger-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:1099;display:none}
-.hamburger-overlay.open{display:block}
-.menu-header{padding:48px 20px 20px;background:#f56a00;color:white}
-.menu-title{font-size:20px;font-weight:800;letter-spacing:0.5px}
-.menu-subtitle{font-size:12px;opacity:0.8;margin-top:2px}
-.menu-items{flex:1;padding:8px 0;overflow-y:auto}
-.menu-item{display:flex;align-items:center;gap:14px;padding:14px 20px;cursor:pointer;font-size:14px;font-weight:600;color:#333;border-bottom:1px solid rgba(0,0,0,0.04)}
-.menu-item:active{background:rgba(245,106,0,0.06)}
-.menu-item-icon{font-size:20px;width:28px;text-align:center}
-.dark .hamburger-menu{background:#1e2128}
-.dark .menu-item{color:rgba(255,255,255,0.85);border-color:rgba(255,255,255,0.05)}
-.speed-circle{position:fixed;bottom:90px;left:16px;width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.95);border:3px solid rgba(0,0,0,0.08);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;box-shadow:0 2px 12px rgba(0,0,0,0.15)}
-.speed-val{font-size:24px;font-weight:800;color:#222;line-height:1}
-.speed-unit{font-size:8px;color:#888;font-weight:600;letter-spacing:1px}
+/* Panel navegación */
+.nav-panel{background:rgba(0,0,0,0.9);backdrop-filter:blur(16px);padding:8px 18px 22px;display:none}
+.nav-panel.active{display:block}
+.nav-row{display:flex;align-items:center}
+.nav-cancel{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;color:rgba(255,255,255,0.6);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:14px}
+.nav-center{flex:1;text-align:center}
+.nav-arrival{font-size:32px;font-weight:900;color:white;line-height:1}
+.nav-details{font-size:13px;color:rgba(255,255,255,0.45);margin-top:4px}
+.nav-dot{margin:0 5px;opacity:.35}
+.nav-recenter{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:14px}
 
-/* ── THEME TOGGLE ── */
-.btn-theme{position:fixed;top:16px;right:16px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.92);border:1px solid rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;z-index:999;font-size:20px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.1)}
+/* ── POPUP CLIENTE ── */
+.client-popup{position:fixed;bottom:145px;left:12px;right:12px;background:rgba(20,24,33,0.97);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.07);border-radius:18px;padding:18px;z-index:1000;display:none;box-shadow:0 8px 36px rgba(0,0,0,0.6)}
+.client-popup.visible{display:block;animation:popUp .22s ease}
+@keyframes popUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.popup-name{font-size:16px;font-weight:800;color:white;margin-bottom:3px}
+.popup-addr{font-size:12px;color:rgba(255,255,255,0.42);margin-bottom:14px}
+.popup-btns{display:flex;gap:8px}
+.popup-btn{flex:1;padding:12px 4px;border-radius:12px;border:none;font-size:13px;font-weight:700;cursor:pointer;text-align:center}
+.pb-route{background:#f56a00;color:white}
+.pb-waze{background:#33ccff;color:#000}
+.pb-gmaps{background:#4285f4;color:white}
+.pb-close{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.55)}
 
-/* ── RECENTER ── */
-.btn-recenter{position:fixed;bottom:170px;right:16px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.92);border:1px solid rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;z-index:999;font-size:20px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.1)}
-
-/* ── CLIENT MARKERS ── */
-.client-dot-wrap{cursor:pointer}
-
-/* ── BOTTOM SHEET (search) ── */
-.bottom-sheet{position:fixed;bottom:0;left:0;right:0;z-index:1000}
-.sheet-collapsed{background:rgba(255,255,255,0.97);backdrop-filter:blur(14px);border-top:1px solid rgba(0,0,0,0.06);border-radius:18px 18px 0 0;padding:0 16px 16px}
-.sheet-handle{width:40px;height:4px;background:rgba(0,0,0,0.12);border-radius:2px;margin:10px auto}
-.search-bar{display:flex;align-items:center;background:rgba(0,0,0,0.04);border-radius:12px;padding:0 14px;border:1px solid rgba(0,0,0,0.06)}
-.search-bar .icon{font-size:18px;color:rgba(0,0,0,0.35);margin-right:10px}
-.search-bar input{flex:1;background:none;border:none;color:#222;padding:14px 0;font-size:15px;outline:none}
-.search-bar input::placeholder{color:rgba(0,0,0,0.35)}
-.results{max-height:200px;overflow-y:auto}
-.results::-webkit-scrollbar{width:3px}
-.results::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.1);border-radius:3px}
-.result-item{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid rgba(0,0,0,0.04);cursor:pointer}
-.result-item:active{background:rgba(245,106,0,0.06)}
-.result-icon{width:36px;height:36px;border-radius:10px;background:rgba(245,106,0,0.08);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
-.result-name{font-size:14px;color:#222;font-weight:600}
-.result-addr{font-size:11px;color:#888;margin-top:2px}
-.result-dist{font-size:11px;color:#f56a00;font-weight:700;margin-left:auto;flex-shrink:0}
-
-/* ── CLIENT POPUP ── */
-.client-popup{position:fixed;bottom:170px;left:12px;right:12px;background:rgba(255,255,255,0.97);backdrop-filter:blur(14px);border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:16px;z-index:1000;display:none;box-shadow:0 4px 24px rgba(0,0,0,0.12)}
-.client-popup.visible{display:block;animation:popUp 0.25s ease}
-@keyframes popUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-.popup-name{font-size:16px;font-weight:700;color:#222;margin-bottom:4px}
-.popup-addr{font-size:12px;color:#888;margin-bottom:12px}
-.popup-actions{display:flex;gap:8px}
-.popup-btn{flex:1;padding:10px;border-radius:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
-.popup-btn-route{background:#f56a00;color:white}
-.popup-btn-waze{background:#33ccff;color:white}
-.popup-btn-gmaps{background:#4285f4;color:white}
-.popup-btn-close{background:rgba(0,0,0,0.05);color:#666}
-
-/* ── NAVIGATION SHEET (Google Maps style) ── */
-.nav-sheet{position:fixed;bottom:0;left:0;right:0;z-index:1001;display:none}
-.nav-sheet.active{display:block;animation:slideUp 0.3s ease}
+/* ── SHEET RUTA ── */
+.route-sheet{position:fixed;bottom:0;left:0;right:0;z-index:1001;display:none}
+.route-sheet.active{display:block;animation:slideUp .28s ease}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-.nav-sheet-inner{background:rgba(255,255,255,0.98);backdrop-filter:blur(14px);border-radius:18px 18px 0 0;border-top:1px solid rgba(0,0,0,0.06);padding:16px 20px 24px;box-shadow:0 -4px 30px rgba(0,0,0,0.1)}
-.nav-sheet-handle{width:40px;height:4px;background:rgba(0,0,0,0.12);border-radius:2px;margin:0 auto 16px}
-.nav-sheet-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
-.nav-time{font-size:32px;font-weight:800;color:#222}
-.nav-dist{font-size:16px;color:#888;font-weight:600;margin-left:auto}
-.nav-route-desc{font-size:13px;color:#555;margin-bottom:4px}
-.nav-route-info{font-size:12px;color:#999;margin-bottom:16px}
-.nav-sheet-actions{display:flex;gap:10px}
-.nav-btn{flex:1;padding:14px;border-radius:12px;border:none;font-size:15px;font-weight:700;cursor:pointer;text-align:center}
-.nav-btn-go{background:#4285f4;color:white}
-.nav-btn-later{background:rgba(0,0,0,0.05);color:#555}
-.nav-btn-close{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,0.05);border:none;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.route-inner{background:rgba(20,24,33,0.99);border-radius:20px 20px 0 0;border-top:1px solid rgba(255,255,255,0.06);padding:16px 20px 32px;box-shadow:0 -8px 40px rgba(0,0,0,0.6)}
+.rh{width:36px;height:4px;background:rgba(255,255,255,0.11);border-radius:2px;margin:0 auto 16px}
+.route-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+.route-eta{font-size:36px;font-weight:900;color:white;line-height:1}
+.route-dist{font-size:16px;color:rgba(255,255,255,0.45);font-weight:600;margin-top:6px}
+.route-name{font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:2px}
+.route-info{font-size:11px;color:rgba(255,255,255,0.28)}
+.route-actions{display:flex;gap:10px;margin-top:16px}
+.rb{flex:1;padding:15px;border-radius:14px;border:none;font-size:15px;font-weight:800;cursor:pointer}
+.rb-go{background:#4a90d9;color:white}
+.rb-cancel{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.6)}
 
-/* ── NAV TOP BAR (during active navigation) ── */
-.nav-top{position:fixed;top:0;left:0;right:0;z-index:1001;background:#f56a00;padding:14px 16px;display:none;align-items:center;gap:12px}
-.nav-top.active{display:flex}
-.nav-top-dest{flex:1;color:white;font-size:15px;font-weight:700}
-.nav-top-eta{color:rgba(255,255,255,0.85);font-size:12px}
-.nav-top-close{width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.15);border:none;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-
-/* ── DARK MODE ── */
-body.dark{background:#1a1d23}
-.dark .speed-circle{background:rgba(26,29,35,0.95);border-color:rgba(255,255,255,0.1)}
-.dark .speed-val{color:white}
-.dark .speed-unit{color:rgba(255,255,255,0.5)}
-.dark .btn-theme,.dark .btn-recenter{background:rgba(26,29,35,0.95);border-color:rgba(255,255,255,0.1);color:white}
-.dark .sheet-collapsed{background:rgba(26,29,35,0.97)}
-.dark .sheet-handle{background:rgba(255,255,255,0.15)}
-.dark .search-bar{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.06)}
-.dark .search-bar input{color:white}
-.dark .search-bar input::placeholder{color:rgba(255,255,255,0.35)}
-.dark .result-name{color:white}
-.dark .result-addr{color:rgba(255,255,255,0.4)}
-.dark .result-item{border-bottom-color:rgba(255,255,255,0.04)}
-.dark .client-popup{background:rgba(26,29,35,0.97);border-color:rgba(255,255,255,0.08)}
-.dark .popup-name{color:white}
-.dark .popup-addr{color:rgba(255,255,255,0.5)}
-.dark .popup-btn-close{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6)}
-.dark .nav-sheet-inner{background:rgba(26,29,35,0.98)}
-.dark .nav-sheet-handle{background:rgba(255,255,255,0.15)}
-.dark .nav-time{color:white}
-.dark .nav-dist{color:rgba(255,255,255,0.5)}
-.dark .nav-route-desc{color:rgba(255,255,255,0.6)}
-.dark .nav-route-info{color:rgba(255,255,255,0.35)}
-.dark .nav-btn-later{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6)}
-.dark .nav-btn-close{background:rgba(255,255,255,0.08)}
-
-/* ── NAV BOTTOM BAR (Waze style) ── */
-.nav-bottom{position:fixed;bottom:0;left:0;right:0;z-index:1001;display:none}
-.nav-bottom.active{display:block;animation:slideUp 0.3s ease}
-.nav-bottom-inner{background:rgba(255,255,255,0.98);backdrop-filter:blur(14px);border-radius:18px 18px 0 0;border-top:1px solid rgba(0,0,0,0.06);padding:8px 20px 24px;box-shadow:0 -4px 24px rgba(0,0,0,0.08)}
-.nav-bottom-handle{width:40px;height:4px;background:rgba(0,0,0,0.12);border-radius:2px;margin:0 auto 12px}
-.nav-bottom-content{display:flex;align-items:center;gap:16px}
-.nav-bottom-icon{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;flex-shrink:0;border:none}
-.nav-bottom-center{flex:1;text-align:center}
-.nav-bottom-arrival{font-size:28px;font-weight:800;color:#222;line-height:1.2}
-.nav-bottom-details{font-size:13px;color:#888;margin-top:2px}
-.nav-dot{margin:0 6px;color:#ccc}
-
-.dark .nav-bottom-inner{background:rgba(26,29,35,0.98);border-top-color:rgba(255,255,255,0.06)}
-.dark .nav-bottom-handle{background:rgba(255,255,255,0.15)}
-.dark .nav-bottom-icon{background:rgba(255,255,255,0.08)}
-.dark .nav-bottom-arrival{color:white}
-.dark .nav-bottom-details{color:rgba(255,255,255,0.5)}
-.dark .nav-dot{color:rgba(255,255,255,0.2)}
+/* ── LIGHT MODE ── */
+body.light{background:#e8e0d5}
+.light .speedometer{background:rgba(255,255,255,0.92);border-color:rgba(0,0,0,0.07)}
+.light .speed-val{color:#222}
+.light .speed-unit{color:#888}
+.light .fab{background:rgba(255,255,255,0.93)}
+.light .search-panel,.light .nav-panel{background:rgba(255,255,255,0.97)}
+.light .sh,.light .nav-row .sh{background:rgba(0,0,0,0.1)}
+.light .search-row{background:rgba(0,0,0,0.04);border-color:rgba(0,0,0,0.06)}
+.light .search-input{color:#222}
+.light .search-input::placeholder{color:rgba(0,0,0,0.35)}
+.light .si,.light .sm{color:rgba(0,0,0,0.38)}
+.light .qt{background:rgba(0,0,0,0.04);border-color:rgba(0,0,0,0.05)}
+.light .qt-lb{color:#555}
+.light .rname{color:#222}
+.light .rsub{color:#888}
+.light .result-row{border-color:rgba(0,0,0,0.05)}
+.light .client-popup,.light .route-inner{background:rgba(255,255,255,0.99);border-color:rgba(0,0,0,0.07)}
+.light .popup-name,.light .route-eta{color:#222}
+.light .popup-addr,.light .route-name,.light .route-dist{color:#888}
+.light .pb-close,.light .rb-cancel{background:rgba(0,0,0,0.06);color:#666}
+.light .nav-arrival{color:#222}
+.light .nav-details{color:#888}
+.light .nav-top{background:#f0f0f0}
+.light .nav-top-dist,.light .nav-top-street{color:#222}
 </style>
 </head>
 <body>
 
-<!-- Hamburger button -->
-<div class="hamburger-btn" onclick="openMenu()">
-  <span></span><span></span><span></span>
-</div>
-
-<!-- Overlay -->
-<div class="hamburger-overlay" id="menuOverlay" onclick="closeMenu()"></div>
-
-<!-- Slide menu -->
-<div class="hamburger-menu" id="hamburgerMenu">
-  <div class="menu-header">
-    <div class="menu-title">🗺️ Ubify GPS</div>
-    <div class="menu-subtitle" id="menuAgentName">Agente</div>
-  </div>
-  <div class="menu-items">
-    <div class="menu-item" onclick="closeMenu();toggleTheme()">
-      <span class="menu-item-icon">🌓</span> Modo claro / oscuro
-    </div>
-    <div class="menu-item" onclick="closeMenu();recenter()">
-      <span class="menu-item-icon">🎯</span> Centrar en mi posición
-    </div>
-    <div class="menu-item" onclick="closeMenu();if(window.Android&&window.Android.goBack)window.Android.goBack()">
-      <span class="menu-item-icon">◀</span> Volver
-    </div>
-  </div>
-</div>
-
-<div class="speed-circle"><div class="speed-val" id="speedVal">0</div><div class="speed-unit">km/h</div></div>
-<div class="btn-theme" id="btnThemeMap" onclick="toggleTheme()">🌙</div>
-
-
 <div id="map"></div>
 
-<!-- Nav top bar (during active nav) -->
-<div class="nav-top" id="navTop">
-  <div style="flex:1"><div class="nav-top-dest" id="navTopDest">--</div><div class="nav-top-eta" id="navTopEta">--</div></div>
-  <button class="nav-top-close" onclick="stopNavigation()">✕</button>
+<!-- FABs derecha -->
+<div class="fab-col" id="fabCol">
+  <button class="fab" onclick="toggleMenu()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+  <button class="fab" id="fabTheme" onclick="toggleTheme()">
+    <svg viewBox="0 0 24 24" fill="white"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+  </button>
 </div>
 
-<!-- Nav bottom bar (Waze style - during active nav) -->
-<div class="nav-bottom" id="navBottom">
-  <div class="nav-bottom-inner">
-    <div class="nav-bottom-handle"></div>
-    <div class="nav-bottom-content">
-      <div class="nav-bottom-icon" onclick="stopNavigation()">✕</div>
-      <div class="nav-bottom-center">
-        <div class="nav-bottom-arrival" id="navArrival">--:-- --</div>
-        <div class="nav-bottom-details">
-          <span id="navRemainTime">-- min</span>
-          <span class="nav-dot">•</span>
-          <span id="navRemainDist">-- km</span>
+<div class="fab-alert" onclick="reportAlert()">
+  <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+    <line x1="12" y1="9" x2="12" y2="13"/><circle cx="12" cy="17" r="1" fill="white"/>
+  </svg>
+</div>
+
+<!-- Velocímetro -->
+<div class="speedometer">
+  <div class="speed-val" id="speedVal">0</div>
+  <div class="speed-unit">km/h</div>
+</div>
+
+<!-- Barra superior (navegación activa) -->
+<div class="nav-top" id="navTop">
+  <div class="nav-top-inner">
+    <div class="turn-box" id="turnBox">↑</div>
+    <div class="nav-top-info">
+      <div class="nav-top-dist" id="navTopDist">--</div>
+      <div class="nav-top-street" id="navTopStreet">--</div>
+    </div>
+    <button class="nav-top-close" onclick="stopNavigation()">✕</button>
+  </div>
+</div>
+
+<!-- Barra inferior -->
+<div class="bottom-bar">
+  <!-- Búsqueda -->
+  <div class="search-panel" id="searchPanel">
+    <div class="sh"></div>
+    <div class="search-row">
+      <span class="si">🔍</span>
+      <input class="search-input" id="searchInput" type="text" placeholder="¿Adónde vas?" oninput="searchClients(this.value)">
+      <span class="sm">🎤</span>
+    </div>
+    <div class="quick-tabs">
+      <div class="qt" onclick="centerOnUser()"><div class="qt-ic">🏠</div><div class="qt-lb">Casa</div></div>
+      <div class="qt" onclick="centerOnUser()"><div class="qt-ic">💼</div><div class="qt-lb">Trabajo</div></div>
+      <div class="qt"><div class="qt-ic">＋</div><div class="qt-lb">Nuevo</div></div>
+    </div>
+    <div class="results-list" id="resultsList"></div>
+  </div>
+  <!-- Navegación activa -->
+  <div class="nav-panel" id="navPanel">
+    <div class="sh" style="margin-bottom:12px"></div>
+    <div class="nav-row">
+      <button class="nav-cancel" onclick="stopNavigation()">✕</button>
+      <div class="nav-center">
+        <div class="nav-arrival" id="navArrival">--:--</div>
+        <div class="nav-details">
+          <span id="navRemainTime">-- min</span><span class="nav-dot">•</span><span id="navRemainDist">-- km</span>
         </div>
       </div>
-      <div class="nav-bottom-icon" onclick="recenter()">🧭</div>
+      <button class="nav-recenter" onclick="recenter()">🎯</button>
     </div>
   </div>
 </div>
 
-<!-- Client popup -->
+<!-- Popup cliente -->
 <div class="client-popup" id="clientPopup">
   <div class="popup-name" id="popupName">--</div>
   <div class="popup-addr" id="popupAddr">--</div>
-  <div class="popup-actions">
-    <button class="popup-btn popup-btn-route" onclick="startRoutePreview()">🗺️ Ruta</button>
-    <button class="popup-btn popup-btn-waze" onclick="openWaze()">Waze</button>
-    <button class="popup-btn popup-btn-gmaps" onclick="openGoogleMaps()">Maps</button>
-    <button class="popup-btn popup-btn-close" onclick="closePopup()">✕</button>
+  <div class="popup-btns">
+    <button class="popup-btn pb-route" onclick="startRoutePreview()">🗺️ Ruta</button>
+    <button class="popup-btn pb-waze" onclick="openWaze()">Waze</button>
+    <button class="popup-btn pb-gmaps" onclick="openGoogleMaps()">Maps</button>
+    <button class="popup-btn pb-close" onclick="closePopup()">✕</button>
   </div>
 </div>
 
-<!-- Navigation sheet (Google Maps style - before starting) -->
-<div class="nav-sheet" id="navSheet">
-  <div class="nav-sheet-inner">
-    <div class="nav-sheet-handle"></div>
-    <div class="nav-sheet-header">
+<!-- Sheet de ruta -->
+<div class="route-sheet" id="routeSheet">
+  <div class="route-inner">
+    <div class="rh"></div>
+    <div class="route-head">
       <div>
-        <div class="nav-time" id="navSheetTime">--</div>
-        <div class="nav-route-desc" id="navSheetRoute">Calculando ruta...</div>
-        <div class="nav-route-info" id="navSheetInfo">Buscando mejor ruta</div>
+        <div class="route-eta" id="routeEta">--</div>
+        <div class="route-name" id="routeName">Calculando...</div>
+        <div class="route-info" id="routeInfo">Mejor ruta · Tráfico habitual</div>
       </div>
-      <div class="nav-dist" id="navSheetDist">--</div>
+      <div class="route-dist" id="routeDist">--</div>
     </div>
-    <div class="nav-sheet-actions">
-      <button class="nav-btn nav-btn-later" onclick="stopNavigation()">Cancelar</button>
-      <button class="nav-btn nav-btn-go" onclick="startActiveNav()">Ir ahora</button>
+    <div class="route-actions">
+      <button class="rb rb-cancel" onclick="cancelRoute()">Cancelar</button>
+      <button class="rb rb-go" onclick="startActiveNav()">Ir ahora</button>
     </div>
   </div>
 </div>
 
-<!-- Bottom sheet (search) -->
-<div class="bottom-sheet" id="bottomSheet">
-  <div class="sheet-collapsed">
-    <div class="sheet-handle"></div>
-    <div class="search-bar">
-      <span class="icon">🔍</span>
-      <input type="text" id="searchInput" placeholder="¿A cuál cliente vas?" oninput="searchClients(this.value)">
+<!-- Menú lateral -->
+<div style="position:fixed;inset:0;z-index:1100;display:none" id="menuWrap">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,0.45)" onclick="closeMenu()"></div>
+  <div style="position:absolute;top:0;left:0;bottom:0;width:272px;background:#1b2433;display:flex;flex-direction:column;box-shadow:4px 0 28px rgba(0,0,0,0.5);animation:menuIn .25s ease">
+    <div style="padding:52px 20px 20px;background:rgba(245,106,0,0.9)">
+      <div style="font-size:22px;font-weight:800;color:white">🗺️ Ubify GPS</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:3px" id="menuUser">Agente</div>
     </div>
-    <div class="results" id="results"></div>
+    <div style="flex:1;overflow-y:auto">
+      <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;color:rgba(255,255,255,0.8);font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05)" onclick="closeMenu();toggleTheme()">🌓 Modo claro / oscuro</div>
+      <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;color:rgba(255,255,255,0.8);font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05)" onclick="closeMenu();recenter()">🎯 Centrar en mi posición</div>
+      <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;color:rgba(255,255,255,0.8);font-size:14px;font-weight:600;cursor:pointer" onclick="closeMenu();if(window.Android&&window.Android.goBack)window.Android.goBack()">◀ Volver</div>
+    </div>
   </div>
 </div>
+<style>@keyframes menuIn{from{transform:translateX(-100%)}to{transform:translateX(0)}}</style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
-// ═══════════════════════════════════════════════════════════
-// CONFIG
-// ═══════════════════════════════════════════════════════════
-let COMPANY_ID = 'demo_corp', USER_ID = '', userName = 'Agente';
-function setConfig(c, u, n) { COMPANY_ID = c; USER_ID = u; userName = n; initFirebase(); }
+// ═══ CONFIG ═══
+let COMPANY_ID='demo_corp', USER_ID='', userName='Agente';
+function setConfig(c,u,n){COMPANY_ID=c;USER_ID=u;userName=n;document.getElementById('menuUser').textContent=n;initFirebase();}
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAP8HT3Zj1chnXt4Yes6dOPCCss6Vdmehw",
-  authDomain: "tracking-gps-arrazolapp.firebaseapp.com",
-  databaseURL: "https://tracking-gps-arrazolapp-default-rtdb.firebaseio.com",
-  projectId: "tracking-gps-arrazolapp",
-  storageBucket: "tracking-gps-arrazolapp.firebasestorage.app",
-  messagingSenderId: "931177352455",
-  appId: "1:931177352455:web:1c8c4cbf4b9607d64689a2"
+firebase.initializeApp({
+  apiKey:"AIzaSyAP8HT3Zj1chnXt4Yes6dOPCCss6Vdmehw",
+  authDomain:"tracking-gps-arrazolapp.firebaseapp.com",
+  databaseURL:"https://tracking-gps-arrazolapp-default-rtdb.firebaseio.com",
+  projectId:"tracking-gps-arrazolapp",
+  storageBucket:"tracking-gps-arrazolapp.firebasestorage.app",
+  messagingSenderId:"931177352455",
+  appId:"1:931177352455:web:1c8c4cbf4b9607d64689a2"
+});
+const db=firebase.database();
+
+// ═══ MAPA ═══
+const map=L.map('map',{center:[9.9381,-84.0795],zoom:16,zoomControl:false,attributionControl:false});
+let isDark=true;
+const TILES={
+  dark:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  light:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
 };
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+let tileLayer=L.tileLayer(TILES.dark,{maxZoom:19}).addTo(map);
 
-// ═══════════════════════════════════════════════════════════
-// MAP (default: LIGHT mode)
-// ═══════════════════════════════════════════════════════════
-const map = L.map('map', { center: [9.9381, -84.0795], zoom: 15, zoomControl: false, attributionControl: false });
-
-let isDark = false;
-const tiles = {
-  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-};
-let tileLayer = L.tileLayer(tiles.light, { maxZoom: 19 }).addTo(map);
-
-function toggleTheme() {
-  isDark = !isDark;
+function toggleTheme(){
+  isDark=!isDark;
   map.removeLayer(tileLayer);
-  tileLayer = L.tileLayer(isDark ? tiles.dark : tiles.light, { maxZoom: 19 }).addTo(map);
-  document.body.className = isDark ? 'dark' : '';
-  document.getElementById('btnThemeMap').textContent = isDark ? '☀️' : '🌙';
+  tileLayer=L.tileLayer(isDark?TILES.dark:TILES.light,{maxZoom:19}).addTo(map);
+  document.body.className=isDark?'':'light';
 }
 
-// ═══════════════════════════════════════════════════════════
-// USER POSITION (Navigation Arrow)
-// ═══════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════
-// POSICIÓN DEL USUARIO + NORTE FIJO (estilo Waze)
-// ═══════════════════════════════════════════════════════════
-let userMarker = null, accuracyCircle = null;
-let userLat = 0, userLng = 0, heading = 0, smoothHeading = 0;
-let isFollowing  = true;
-const northLocked = true;  // SIEMPRE: cursor arriba, mapa rota con heading
-let mapPaneAngle = 0;      // ángulo actual de rotación del mapa
+// ═══ CURSOR + NORTE FIJO ═══
+let userMarker=null,accuracyCircle=null;
+let userLat=0,userLng=0,curH=0,smoothH=0,isFollowing=true;
 
-// SVG del cursor — siempre apunta arriba, nunca rota
-const CURSOR_SVG = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="36" height="36" class="nav-arrow-svg">
+const CURSOR=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="38" height="44">
   <defs>
-    <filter id="cshadow"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/></filter>
-    <radialGradient id="cgrad" cx="50%" cy="40%" r="60%">
-      <stop offset="0%" stop-color="#4FD8EE"/>
-      <stop offset="100%" stop-color="#0FAFC8"/>
+    <filter id="cs"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="rgba(0,0,0,0.4)"/></filter>
+    <radialGradient id="cg" cx="50%" cy="38%" r="62%">
+      <stop offset="0%" stop-color="#5BE0F5"/><stop offset="100%" stop-color="#09B8D8"/>
     </radialGradient>
   </defs>
-  <!-- borde blanco -->
-  <path d="M50 5 L90 85 Q90 95 79 95 Q67 95 50 87 Q33 95 21 95 Q10 95 10 85 Z"
-        fill="white" filter="url(#cshadow)"/>
-  <!-- cuerpo celeste -->
-  <path d="M50 12 L84 83 Q84 90 74 90 Q63 89 50 82 Q37 89 26 90 Q16 90 16 83 Z"
-        fill="url(#cgrad)"/>
-  <!-- reflejo -->
-  <path d="M50 12 L74 70 Q63 65 50 62 Q37 65 26 70 Z" fill="rgba(255,255,255,0.2)"/>
+  <path d="M50 4 L93 90 Q93 101 80 101 Q67 101 50 93 Q33 101 20 101 Q7 101 7 90 Z" fill="white" filter="url(#cs)"/>
+  <path d="M50 11 L87 88 Q87 96 76 96 Q64 96 50 89 Q36 96 24 96 Q13 96 13 88 Z" fill="url(#cg)"/>
+  <path d="M50 11 L76 76 Q64 72 50 69 Q36 72 24 76 Z" fill="rgba(255,255,255,0.18)"/>
 </svg>`;
 
-// Suavizado de ángulo para evitar jitter
-function lerpAngle(a, b, t) {
-  let d = b - a;
-  while (d > 180)  d -= 360;
-  while (d < -180) d += 360;
-  return a + d * t;
+function lerpAngle(a,b,t){let d=b-a;while(d>180)d-=360;while(d<-180)d+=360;return a+d*t;}
+
+function setMapBearing(deg){
+  const pane=document.querySelector('.leaflet-map-pane');
+  if(!pane)return;
+  const m=pane.style.transform.match(/translate3d\([^)]+\)/);
+  const tr=m?m[0]:'translate3d(0px,0px,0px)';
+  pane.style.transformOrigin='50% 50%';
+  pane.style.transform=`${tr} rotate(${deg}deg)`;
+  const ov=document.querySelector('.leaflet-overlay-pane');
+  if(ov){const m2=ov.style.transform?.match(/translate3d\([^)]+\)/);const tr2=m2?m2[0]:'translate3d(0px,0px,0px)';ov.style.transformOrigin='50% 50%';ov.style.transform=`${tr2} rotate(${deg}deg)`;}
 }
 
-// Rotar el pane de tiles de Leaflet (solo los tiles, no los marcadores)
-function setMapRotation(deg) {
-  const pane = document.querySelector('.leaflet-map-pane');
-  if (!pane) return;
-  mapPaneAngle = deg;
-  const match = pane.style.transform.match(/translate3d\([^)]+\)/);
-  const tr    = match ? match[0] : 'translate3d(0px,0px,0px)';
-  pane.style.transformOrigin = '50% 50%';
-  pane.style.transform       = `${tr} rotate(${deg}deg)`;
-}
+function updateUserPosition(lat,lng,accuracy,speed,hdg){
+  userLat=lat;userLng=lng;
+  const kmh=speed?Math.round(Math.abs(speed)*3.6):0;
+  document.getElementById('speedVal').textContent=kmh;
+  if(hdg!=null&&kmh>3){smoothH=lerpAngle(smoothH,hdg,0.18);curH=smoothH;}
 
-// Solo el pane de overlays (rutas, geocercas) también debe rotar — los marcadores NO
-function syncOverlayRotation(deg) {
-  ['leaflet-overlay-pane','leaflet-shadow-pane'].forEach(cls => {
-    const el = document.querySelector('.' + cls);
-    if (!el) return;
-    const match = el.style.transform?.match(/translate3d\([^)]+\)/);
-    const tr    = match ? match[0] : 'translate3d(0px,0px,0px)';
-    el.style.transformOrigin = '50% 50%';
-    el.style.transform       = `${tr} rotate(${deg}deg)`;
-  });
-}
-
-function updateUserPosition(lat, lng, accuracy, speed, hdg) {
-  userLat = lat;
-  userLng = lng;
-  const kmh = speed ? Math.round(Math.abs(speed) * 3.6) : 0;
-  document.getElementById('speedVal').textContent = kmh;
-
-  // Actualizar heading solo si hay velocidad suficiente (>3 km/h)
-  // Bajo 3 km/h el heading del GPS es inestable — igual que Waze
-  if (hdg != null && kmh > 3) {
-    smoothHeading = lerpAngle(smoothHeading, hdg, 0.2);
-    heading = smoothHeading;
-  }
-
-  // Crear marcador si no existe
-  if (!userMarker) {
-    userMarker = L.marker([lat, lng], {
-      icon: L.divIcon({
-        className: 'nav-arrow-wrap',
-        html: `<div class="nav-glow"></div>${CURSOR_SVG}`,
-        iconSize:   [36, 36],
-        iconAnchor: [18, 18]
-      }),
-      zIndexOffset: 1000,
-      interactive: false
+  if(!userMarker){
+    userMarker=L.marker([lat,lng],{
+      icon:L.divIcon({className:'nav-wrap',html:`<div class="nav-glow"></div>${CURSOR}`,iconSize:[38,44],iconAnchor:[19,22]}),
+      zIndexOffset:1000,interactive:false
     }).addTo(map);
-
-    accuracyCircle = L.circle([lat, lng], {
-      radius: Math.min(accuracy || 20, 100),
-      className: 'accuracy-circle',
-      interactive: false
-    }).addTo(map);
-
-    map.setView([lat, lng], 16);
+    accuracyCircle=L.circle([lat,lng],{radius:Math.min(accuracy||20,120),fillColor:'rgba(0,188,212,0.06)',fillOpacity:1,color:'rgba(0,188,212,0.2)',weight:1}).addTo(map);
+    map.setView([lat,lng],17);
   } else {
-    userMarker.setLatLng([lat, lng]);
-    accuracyCircle.setLatLng([lat, lng]).setRadius(Math.min(accuracy || 20, 100));
+    userMarker.setLatLng([lat,lng]);
+    accuracyCircle.setLatLng([lat,lng]).setRadius(Math.min(accuracy||20,120));
   }
-
-  // Aplicar rotación según el modo
-  if (northLocked) {
-    // NORTE FIJO: el cursor NO rota (siempre apunta arriba)
-    // El MAPA rota en sentido contrario al heading
-    setMapRotation(-heading);
-    syncOverlayRotation(-heading);
-    // El compás muestra el ángulo real del norte
-    const needle = document.getElementById('compassNeedle');
-    if (needle) needle.style.transform = `rotate(${heading}deg)`;
-  }
-  // En modo libre: el mapa no rota, el cursor rota (código abajo no aplica nada al mapa)
-
-  if (isFollowing) {
-    map.panTo([lat, lng], { animate: true, duration: 0.4 });
-  }
-
-  if (navActive && navTarget) updateActiveNavInfo();
+  setMapBearing(-curH);
+  if(isFollowing)map.panTo([lat,lng],{animate:true,duration:0.35});
+  if(navActive&&navTarget)updateNavInfo();
 }
 
-// ── Toggle entre norte fijo y modo libre ──
-function toggleNorthLock() {
-  northLocked = !northLocked;
-  const btn    = document.getElementById('btnNorth');
-  const badge  = document.getElementById('northBadge');
-  const needle = document.getElementById('compassNeedle');
-
-  if (northLocked) {
-    // Activar norte fijo
-    btn.classList.add('active');
-    badge.textContent = '🧭 NORTE FIJO';
-    badge.classList.add('show');
-    isFollowing = true;
-    if (userLat) map.panTo([userLat, userLng], { animate: true, duration: 0.4 });
-  } else {
-    // Modo libre: resetear rotación del mapa
-    btn.classList.remove('active');
-    badge.textContent = '🔓 LIBRE';
-    badge.classList.add('show');
-    setMapRotation(0);
-    syncOverlayRotation(0);
-    if (needle) needle.style.transform = 'rotate(0deg)';
-  }
-
-  clearTimeout(badge._t);
-  badge._t = setTimeout(() => badge.classList.remove('show'), 2200);
-}
-
-function recenter() {
-  isFollowing = true;
-  if (userLat) map.flyTo([userLat, userLng], 16, { duration: 0.5 });
-}
-
-map.on('dragstart', () => {
-  isFollowing = false;
-  // En norte fijo, al arrastrar seguimos con el norte fijo pero sin seguir al agente
-});
-
-// Collapse bottom sheet when tapping on the map
-map.on('click', () => {
-  const sheet = document.getElementById('bottomSheet');
-  const popup = document.getElementById('clientPopup');
-  // Minimize bottom sheet (hide results, keep search bar)
-  document.getElementById('results').innerHTML = '';
-  document.getElementById('searchInput').value = '';
-  document.getElementById('searchInput').blur();
-  // Close client popup
-  popup.classList.remove('visible');
-  selectedClient = null;
-});
-
-// GPS from Android or browser
-function onGpsUpdate(lat, lng, accuracy, speed) { updateUserPosition(lat, lng, accuracy, speed); }
-
-// Activar norte fijo visualmente al cargar
-window.addEventListener('load', () => {
-  const btn = document.getElementById('btnNorth');
-  if (btn) btn.classList.add('active');
-});
-if (navigator.geolocation) {
+function recenter(){isFollowing=true;if(userLat)map.flyTo([userLat,userLng],17,{duration:0.5});}
+function centerOnUser(){recenter();}
+map.on('dragstart',()=>{isFollowing=false;});
+map.on('click',()=>{closePopup();collapseSearch();});
+function onGpsUpdate(lat,lng,accuracy,speed){updateUserPosition(lat,lng,accuracy,speed);}
+if(navigator.geolocation){
   navigator.geolocation.watchPosition(
-    p => updateUserPosition(p.coords.latitude, p.coords.longitude, p.coords.accuracy, p.coords.speed, p.coords.heading),
-    () => {}, { enableHighAccuracy: true, maximumAge: 3000 }
+    p=>updateUserPosition(p.coords.latitude,p.coords.longitude,p.coords.accuracy,p.coords.speed,p.coords.heading),
+    ()=>{},{enableHighAccuracy:true,maximumAge:2000}
   );
 }
 
-// ═══════════════════════════════════════════════════════════
-// CLIENTS
-// ═══════════════════════════════════════════════════════════
-let allClients = [], clientMarkers = {}, selectedClient = null;
-let navTarget = null, navActive = false, routeLine = null, routeCoords = null;
+// ═══ CLIENTES ═══
+let allClients=[],clientMarkers={},selectedClient=null;
+let navTarget=null,navActive=false,routeLine=null;
 
-function initFirebase() {
-  if (!COMPANY_ID) return;
-  db.ref(`companies/${COMPANY_ID}/clientes`).on('value', snap => {
-    const data = snap.val() || {};
-    allClients = [];
-    Object.values(clientMarkers).forEach(m => map.removeLayer(m));
-    clientMarkers = {};
-    Object.entries(data).forEach(([id, c]) => {
-      // Normalize field names (handle Nombre/nombre/NOMBRE etc)
-      const norm = {
-        id,
-        nombre: c.nombre || c.Nombre || c.NOMBRE || 'Cliente',
-        lat: parseFloat(c.lat || c.Lat || c.LAT || 0),
-        lng: parseFloat(c.lng || c.Lng || c.LNG || c.lon || c.Lon || 0),
-        codigo: c.codigo || c.Codigo || c.CODIGO || '',
-        telefono: c.telefono || c.Telefono || c.TELEFONO || '',
-        direccion: c.direccion || c.Direccion || c.DIRECCION || '',
-        zona: c.zona || c.Zona || c.ZONA || '',
-        categoria: c.categoria || c.Categoria || '',
-        radio: c.radio_m || c.radio || c.Radio || 50
-      };
-      if (!norm.lat || !norm.lng) return;
+function initFirebase(){
+  if(!COMPANY_ID)return;
+  db.ref(`companies/${COMPANY_ID}/clientes`).on('value',snap=>{
+    const data=snap.val()||{};
+    allClients=[];
+    Object.values(clientMarkers).forEach(m=>map.removeLayer(m));
+    clientMarkers={};
+    Object.entries(data).forEach(([id,c])=>{
+      const lat=parseFloat(c.lat||c.Lat||0),lng=parseFloat(c.lng||c.Lng||c.lon||0);
+      if(!lat||!lng)return;
+      const norm={id,lat,lng,nombre:c.nombre||c.Nombre||'Cliente',codigo:c.codigo||'',telefono:c.telefono||'',direccion:c.direccion||'',zona:c.zona||''};
       allClients.push(norm);
-      const m = L.circleMarker([norm.lat, norm.lng], {
-        radius: 5, fillColor: '#f56a00', fillOpacity: 0.8, color: 'white', weight: 1.5, opacity: 0.9
-      }).addTo(map);
-      m.on('click', () => showClientPopup(norm, id));
-      clientMarkers[id] = m;
+      const pin=L.divIcon({className:'',html:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 80" width="16" height="21"><path d="M30 2C16 2 5 13 5 27c0 18 25 51 25 51S55 45 55 27C55 13 44 2 30 2z" fill="#f56a00" stroke="white" stroke-width="3"/><circle cx="30" cy="27" r="9" fill="white" opacity="0.85"/></svg>`,iconSize:[16,21],iconAnchor:[8,21]});
+      const mk=L.marker([lat,lng],{icon:pin}).addTo(map);
+      mk.on('click',e=>{L.DomEvent.stop(e);showClientPopup(norm);});
+      clientMarkers[id]=mk;
     });
-    console.log('Clientes cargados:', allClients.length);
     showNearbyClients();
   });
 }
 
-// ═══════════════════════════════════════════════════════════
-// SEARCH
-// ═══════════════════════════════════════════════════════════
-function searchClients(q) {
-  if (!q || q.length < 2) { showNearbyClients(); return; }
-  const query = q.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // remove accents
-  const matched = allClients
-    .filter(c => {
-      // Search across ALL text fields for maximum flexibility
-      const searchable = [
-        c.nombre, c.Nombre, c.NOMBRE,
-        c.codigo, c.Codigo, c.CODIGO,
-        c.direccion, c.Direccion, c.DIRECCION,
-        c.telefono, c.Telefono,
-        c.zona, c.Zona,
-        c.categoria, c.Categoria
-      ].filter(Boolean).join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      return searchable.includes(query);
-    })
-    .slice(0, 30).map(c => ({ ...c, dist: userLat ? haversine(userLat, userLng, c.lat, c.lng) : 999 }))
-    .sort((a, b) => a.dist - b.dist);
-  renderResults(matched);
+// ═══ BÚSQUEDA ═══
+function norm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function searchClients(q){
+  if(!q||q.length<2){showNearbyClients();return;}
+  const qn=norm(q);
+  renderResults(allClients.filter(c=>norm([c.nombre,c.codigo,c.direccion,c.zona].join(' ')).includes(qn)).map(c=>({...c,dist:userLat?hav(userLat,userLng,c.lat,c.lng):999})).sort((a,b)=>a.dist-b.dist).slice(0,30));
 }
-
-function showNearbyClients() {
-  const el = document.getElementById('results');
-  if (!allClients.length) {
-    el.innerHTML = '<div style="text-align:center;color:#999;padding:20px;font-size:13px">⏳ Cargando clientes...</div>';
-    return;
-  }
-  if (!userLat) {
-    el.innerHTML = `<div style="text-align:center;color:#999;padding:20px;font-size:13px">📍 Esperando GPS... (${allClients.length} clientes cargados)</div>`;
-    return;
-  }
-  renderResults(allClients.map(c => ({ ...c, dist: haversine(userLat, userLng, c.lat, c.lng) })).sort((a,b) => a.dist - b.dist).slice(0, 8));
+function showNearbyClients(){
+  if(!allClients.length){document.getElementById('resultsList').innerHTML='';return;}
+  if(!userLat){document.getElementById('resultsList').innerHTML=`<div style="text-align:center;color:rgba(255,255,255,0.35);padding:14px;font-size:13px">📍 ${allClients.length} clientes cargados</div>`;return;}
+  renderResults(allClients.map(c=>({...c,dist:hav(userLat,userLng,c.lat,c.lng)})).sort((a,b)=>a.dist-b.dist).slice(0,6));
 }
-
-function renderResults(items) {
-  const el = document.getElementById('results');
-  if (!items.length) { el.innerHTML = '<div style="text-align:center;color:#999;padding:20px;font-size:13px">No encontrado</div>'; return; }
-  el.innerHTML = items.map(c => `
-    <div class="result-item" onclick="selectClient('${c.id}')">
-      <div class="result-icon">📍</div>
-      <div><div class="result-name">${c.nombre||'Cliente'}</div><div class="result-addr">${c.direccion||c.zona||''}</div></div>
-      <div class="result-dist">${c.dist < 1 ? Math.round(c.dist*1000)+'m' : c.dist.toFixed(1)+'km'}</div>
-    </div>`).join('');
+function renderResults(items){
+  const el=document.getElementById('resultsList');
+  if(!items.length){el.innerHTML='<div style="text-align:center;color:rgba(255,255,255,0.35);padding:14px;font-size:13px">Sin resultados</div>';return;}
+  el.innerHTML=items.map(c=>`<div class="result-row" onclick="selectClient('${c.id}')"><div class="rpin">📍</div><div class="rinfo"><div class="rname">${c.nombre}</div><div class="rsub">${c.direccion||c.zona||c.codigo||''}</div></div><div class="rdist">${c.dist<1?Math.round(c.dist*1000)+'m':c.dist.toFixed(1)+'km'}</div></div>`).join('');
 }
-
-function selectClient(id) {
-  const c = allClients.find(x => x.id === id);
-  if (!c) return;
-  selectedClient = c;
-  isFollowing = false;
-  // Collapse search
-  document.getElementById('searchInput').blur();
-  document.getElementById('searchInput').value = '';
-  document.getElementById('results').innerHTML = '';
-  // Fly to client
-  map.flyTo([c.lat, c.lng], 16, { duration: 0.5 });
-  setTimeout(() => showClientPopup(c, id), 300);
-}
-
-function showClientPopup(c) {
-  selectedClient = c;
-  document.getElementById('popupName').textContent = c.nombre || 'Cliente';
-  const dist = userLat ? haversine(userLat, userLng, c.lat, c.lng) : 0;
-  document.getElementById('popupAddr').textContent = `📍 ${c.direccion||''} · 📞 ${c.telefono||'--'} · ${dist<1?Math.round(dist*1000)+'m':dist.toFixed(1)+'km'}`;
+function collapseSearch(){document.getElementById('resultsList').innerHTML='';document.getElementById('searchInput').value='';document.getElementById('searchInput').blur();}
+function selectClient(id){const c=allClients.find(x=>x.id===id);if(!c)return;collapseSearch();isFollowing=false;map.flyTo([c.lat,c.lng],17,{duration:0.5});setTimeout(()=>showClientPopup(c),350);}
+function showClientPopup(c){
+  selectedClient=c;
+  document.getElementById('popupName').textContent=c.nombre||'Cliente';
+  const dist=userLat?hav(userLat,userLng,c.lat,c.lng):0;
+  document.getElementById('popupAddr').textContent=[c.codigo&&`Cód: ${c.codigo}`,c.zona,c.telefono&&`📞 ${c.telefono}`,dist>0&&(dist<1?Math.round(dist*1000)+'m':dist.toFixed(1)+'km')].filter(Boolean).join(' · ');
   document.getElementById('clientPopup').classList.add('visible');
 }
-function closePopup() { document.getElementById('clientPopup').classList.remove('visible'); selectedClient = null; }
+function closePopup(){document.getElementById('clientPopup').classList.remove('visible');selectedClient=null;}
 
-// ═══════════════════════════════════════════════════════════
-// WAZE & GOOGLE MAPS (via Android interface)
-// ═══════════════════════════════════════════════════════════
-function openWaze() {
-  if (!selectedClient) return;
-  closePopup();
-  if (window.Android && window.Android.openWaze) {
-    window.Android.openWaze(selectedClient.lat, selectedClient.lng);
-  } else {
-    window.open(`https://waze.com/ul?ll=${selectedClient.lat},${selectedClient.lng}&navigate=yes`, '_blank');
-  }
-}
-function openGoogleMaps() {
-  if (!selectedClient) return;
-  closePopup();
-  if (window.Android && window.Android.openGoogleMaps) {
-    window.Android.openGoogleMaps(selectedClient.lat, selectedClient.lng);
-  } else {
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${selectedClient.lat},${selectedClient.lng}`, '_blank');
-  }
-}
+// ═══ WAZE / GMAPS ═══
+function openWaze(){if(!selectedClient)return;closePopup();if(window.Android?.openWaze)window.Android.openWaze(selectedClient.lat,selectedClient.lng);else window.open(`https://waze.com/ul?ll=${selectedClient.lat},${selectedClient.lng}&navigate=yes`,'_blank');}
+function openGoogleMaps(){if(!selectedClient)return;closePopup();if(window.Android?.openGoogleMaps)window.Android.openGoogleMaps(selectedClient.lat,selectedClient.lng);else window.open(`https://www.google.com/maps/dir/?api=1&destination=${selectedClient.lat},${selectedClient.lng}`,'_blank');}
 
-// ═══════════════════════════════════════════════════════════
-// ROUTE PREVIEW (Google Maps style bottom sheet)
-// ═══════════════════════════════════════════════════════════
-function startRoutePreview() {
-  if (!selectedClient || !userLat) return;
-  navTarget = selectedClient;
-  closePopup();
-
-  // Hide search, show nav sheet
-  document.getElementById('bottomSheet').style.display = 'none';
-  document.getElementById('navSheet').classList.add('active');
-  document.getElementById('navSheetTime').textContent = '...';
-  document.getElementById('navSheetDist').textContent = '';
-  document.getElementById('navSheetRoute').textContent = `Hacia ${navTarget.nombre || 'cliente'}`;
-  document.getElementById('navSheetInfo').textContent = 'Calculando mejor ruta...';
-
-  // Zoom to show both points
-  map.flyToBounds(L.latLngBounds([[userLat, userLng], [navTarget.lat, navTarget.lng]]), { padding: [80, 120], duration: 0.8 });
-
-  // Fetch OSRM route (NO straight line!)
+// ═══ RUTA ═══
+function startRoutePreview(){
+  if(!selectedClient||!userLat)return;
+  navTarget=selectedClient;closePopup();
+  document.getElementById('routeSheet').classList.add('active');
+  document.getElementById('routeEta').textContent='...';
+  document.getElementById('routeDist').textContent='';
+  document.getElementById('routeName').textContent=`Hacia ${navTarget.nombre||'cliente'}`;
+  document.getElementById('routeInfo').textContent='Calculando mejor ruta...';
+  map.flyToBounds(L.latLngBounds([[userLat,userLng],[navTarget.lat,navTarget.lng]]),{padding:[80,120],duration:0.8});
   fetchRoute();
 }
+function cancelRoute(){document.getElementById('routeSheet').classList.remove('active');if(routeLine){map.removeLayer(routeLine);routeLine=null;}navTarget=null;document.getElementById('searchPanel').style.display='';}
 
-async function fetchRoute() {
-  // Try via Android interface first (avoids CORS)
-  if (window.Android && window.Android.fetchRoute) {
-    window.Android.fetchRoute(userLat, userLng, navTarget.lat, navTarget.lng);
-    return;
+async function fetchRoute(){
+  if(window.Android?.fetchRoute){window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);return;}
+  const servers=['https://router.project-osrm.org','https://routing.openstreetmap.de/routed-car'];
+  for(const s of servers){
+    try{
+      const r=await fetch(`${s}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(8000)});
+      if(!r.ok)continue;
+      const d=await r.json();
+      if(d.routes?.[0]){onRouteResult(d);return;}
+    }catch(e){continue;}
   }
-  // Fallback: direct OSRM fetch
-  const servers = ['https://router.project-osrm.org', 'https://routing.openstreetmap.de/routed-car'];
-  for (const server of servers) {
-    try {
-      const url = `${server}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`;
-      const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
-      if (!resp.ok) continue;
-      const data = await resp.json();
-      if (data.routes && data.routes[0]) { onRouteResult(data); return; }
-    } catch(e) { continue; }
-  }
-  onRouteError();
+  document.getElementById('routeEta').textContent='--';
+  document.getElementById('routeName').textContent='No se pudo calcular la ruta';
 }
-
-function onRouteResult(data) {
-  try {
-    if (typeof data === 'string') data = JSON.parse(data);
-    if (!data.routes || !data.routes[0]) { onRouteError(); return; }
-
-    const route = data.routes[0];
-    routeCoords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-
-    // Draw route on map
-    if (routeLine) map.removeLayer(routeLine);
-    routeLine = L.polyline(routeCoords, {
-      color: '#4285f4', weight: 6, opacity: 0.9, lineJoin: 'round', lineCap: 'round'
-    }).addTo(map);
-
-    const distKm = route.distance / 1000;
-    const etaMin = Math.round(route.duration / 60);
-
-    // Update nav sheet
-    document.getElementById('navSheetTime').textContent = `${etaMin} min`;
-    document.getElementById('navSheetDist').textContent = distKm < 1 ? `${Math.round(distKm*1000)} m` : `${distKm.toFixed(1)} km`;
-
-    // Try to get route name from steps
-    let routeName = '';
-    if (route.legs && route.legs[0] && route.legs[0].steps) {
-      const mainRoads = route.legs[0].steps
-        .filter(s => s.name && s.name.length > 3 && s.distance > 500)
-        .map(s => s.name);
-      const unique = [...new Set(mainRoads)].slice(0, 3);
-      routeName = unique.length > 0 ? `Por ${unique.join('; ')}` : '';
-    }
-    document.getElementById('navSheetRoute').textContent = routeName || `Hacia ${navTarget.nombre || 'cliente'}`;
-    document.getElementById('navSheetInfo').textContent = 'Mejor ruta · Tráfico habitual';
-
-    map.flyToBounds(L.latLngBounds(routeCoords), { padding: [60, 100], duration: 0.8 });
-  } catch(e) { onRouteError(); }
+function onRouteResult(data){
+  if(typeof data==='string')data=JSON.parse(data);
+  if(!data.routes?.[0])return;
+  const route=data.routes[0];
+  const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
+  if(routeLine)map.removeLayer(routeLine);
+  routeLine=L.polyline(coords,{color:'#4a90d9',weight:7,opacity:0.9,lineJoin:'round',lineCap:'round'}).addTo(map);
+  const km=route.distance/1000,min=Math.round(route.duration/60);
+  document.getElementById('routeEta').textContent=`${min} min`;
+  document.getElementById('routeDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
+  const roads=(route.legs?.[0]?.steps||[]).filter(s=>s.name&&s.name.length>3&&s.distance>300).map(s=>s.name);
+  document.getElementById('routeName').textContent=[...new Set(roads)].slice(0,2).join(' · ')||`Hacia ${navTarget.nombre||'cliente'}`;
+  document.getElementById('routeInfo').textContent='Mejor ruta · Tráfico habitual';
+  map.flyToBounds(L.latLngBounds(coords),{padding:[60,100],duration:0.8});
 }
+function onRouteResultFromAndroid(){try{if(window._routeJson)onRouteResult(window._routeJson);}catch(e){}}
 
-function onRouteResultFromAndroid() {
-  try { if (window._routeJson) onRouteResult(window._routeJson); else onRouteError(); } catch(e) { onRouteError(); }
-}
-
-function onRouteError() {
-  document.getElementById('navSheetTime').textContent = '--';
-  document.getElementById('navSheetRoute').textContent = 'No se pudo calcular la ruta';
-  document.getElementById('navSheetInfo').textContent = 'Usá Waze o Google Maps para navegar';
-}
-
-// ═══════════════════════════════════════════════════════════
-// ACTIVE NAVIGATION (after pressing "Ir ahora")
-// ═══════════════════════════════════════════════════════════
-function startActiveNav() {
-  navActive = true;
-  document.getElementById('navSheet').classList.remove('active');
+function startActiveNav(){
+  navActive=true;
+  document.getElementById('routeSheet').classList.remove('active');
   document.getElementById('navTop').classList.add('active');
-  document.getElementById('navBottom').classList.add('active');
-  document.getElementById('bottomSheet').style.display = 'none';
-  document.getElementById('navTopDest').textContent = navTarget?.nombre || 'Cliente';
-  isFollowing = true;
-  recenter();
-  updateActiveNavInfo();
+  document.getElementById('searchPanel').style.display='none';
+  document.getElementById('navPanel').classList.add('active');
+  isFollowing=true;
+  map.flyTo([userLat,userLng],18,{duration:0.8});
+  updateNavInfo();
 }
-
-function updateActiveNavInfo() {
-  if (!navTarget || !userLat) return;
-  const dist = haversine(userLat, userLng, navTarget.lat, navTarget.lng);
-  const speedKmh = parseInt(document.getElementById('speedVal').textContent) || 5;
-  const etaMin = Math.max(1, Math.round((dist / (speedKmh || 5)) * 60));
-
-  // Top bar
-  document.getElementById('navTopEta').textContent =
-    `${dist<1 ? Math.round(dist*1000)+' m' : dist.toFixed(1)+' km'} · ~${etaMin} min`;
-
-  // Bottom bar (Waze style)
-  const now = new Date();
-  const arrivalTime = new Date(now.getTime() + etaMin * 60000);
-  const arrivalStr = arrivalTime.toLocaleTimeString('es-CR', { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase();
-
-  document.getElementById('navArrival').textContent = arrivalStr;
-  document.getElementById('navRemainTime').textContent = etaMin < 60 ? `${etaMin} min` : `${Math.floor(etaMin/60)} h ${etaMin%60} min`;
-  document.getElementById('navRemainDist').textContent = dist < 1 ? `${Math.round(dist*1000)} m` : `${dist.toFixed(1)} km`;
-
-  // ⚠️ DO NOT touch routeLine here! The OSRM route stays as-is.
-
-  if (dist < 0.05) {
-    document.getElementById('navArrival').textContent = '✅ ¡Llegaste!';
-    document.getElementById('navRemainTime').textContent = '';
-    document.getElementById('navRemainDist').textContent = '';
-    document.getElementById('navTopEta').textContent = '✅ ¡Llegaste!';
-    setTimeout(stopNavigation, 3000);
-  }
+function updateNavInfo(){
+  if(!navTarget||!userLat)return;
+  const dist=hav(userLat,userLng,navTarget.lat,navTarget.lng);
+  const spd=parseInt(document.getElementById('speedVal').textContent)||5;
+  const etaMin=Math.max(1,Math.round((dist/(spd||5))*60));
+  const arrv=new Date(Date.now()+etaMin*60000).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit',hour12:true}).toUpperCase();
+  document.getElementById('navArrival').textContent=arrv;
+  document.getElementById('navTopDist').textContent=dist<1?`${Math.round(dist*1000)} m`:`${dist.toFixed(1)} km`;
+  document.getElementById('navTopStreet').textContent=navTarget.nombre||'';
+  document.getElementById('navRemainTime').textContent=etaMin<60?`${etaMin} min`:`${Math.floor(etaMin/60)}h ${etaMin%60}m`;
+  document.getElementById('navRemainDist').textContent=dist<1?`${Math.round(dist*1000)} m`:`${dist.toFixed(1)} km`;
+  if(dist<0.05){document.getElementById('navArrival').textContent='✅ ¡Llegaste!';setTimeout(stopNavigation,3000);}
 }
-
-function stopNavigation() {
-  navActive = false;
-  navTarget = null;
-  routeCoords = null;
-  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+function stopNavigation(){
+  navActive=false;navTarget=null;
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
   document.getElementById('navTop').classList.remove('active');
-  document.getElementById('navBottom').classList.remove('active');
-  document.getElementById('navSheet').classList.remove('active');
-  document.getElementById('bottomSheet').style.display = '';
-  isFollowing = true;
-  recenter();
+  document.getElementById('navPanel').classList.remove('active');
+  document.getElementById('routeSheet').classList.remove('active');
+  document.getElementById('searchPanel').style.display='';
+  isFollowing=true;recenter();
 }
 
-// ═══════════════════════════════════════════════════════════
-// UTILS
-// ═══════════════════════════════════════════════════════════
-// ── MENÚ HAMBURGUESA ──
-function openMenu() {
-  document.getElementById('hamburgerMenu').classList.add('open');
-  document.getElementById('menuOverlay').classList.add('open');
-}
-function closeMenu() {
-  document.getElementById('hamburgerMenu').classList.remove('open');
-  document.getElementById('menuOverlay').classList.remove('open');
-}
+// ═══ MENÚ ═══
+function toggleMenu(){const w=document.getElementById('menuWrap');w.style.display=w.style.display==='block'?'none':'block';}
+function closeMenu(){document.getElementById('menuWrap').style.display='none';}
+function reportAlert(){}
 
-function haversine(lat1,lon1,lat2,lon2) {
-  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
-  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
+// ═══ UTILS ═══
+function hav(la1,lo1,la2,lo2){const R=6371,dLa=(la2-la1)*Math.PI/180,dLo=(lo2-lo1)*Math.PI/180;const a=Math.sin(dLa/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLo/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
 
-setInterval(() => { if (userLat && !document.getElementById('searchInput').value && !navActive) showNearbyClients(); }, 15000);
-setTimeout(() => { if (!USER_ID) initFirebase(); }, 1500);
+setInterval(()=>{if(userLat&&!navActive)showNearbyClients();},15000);
+setTimeout(()=>{if(!USER_ID)initFirebase();},1500);
 </script>
 </body>
 </html>

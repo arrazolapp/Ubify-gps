@@ -12,43 +12,25 @@ body{background:#e8e8e8;overflow:hidden;font-family:'Segoe UI',system-ui,sans-se
 .leaflet-control-zoom,.leaflet-control-attribution{display:none!important}
 
 /* ── NAV ARROW — cursor fijo, siempre apunta arriba ── */
-.nav-arrow-wrap{width:36px;height:36px;position:relative;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.35));overflow:visible}
-.nav-arrow-svg{width:36px;height:36px;display:block}
+.nav-arrow-wrap{width:28px;height:28px;position:relative;filter:drop-shadow(0 3px 10px rgba(0,0,0,0.4))}
+.nav-arrow-svg{width:56px;height:56px;display:block}
 .nav-glow{position:absolute;inset:-10px;border-radius:50%;background:radial-gradient(circle,rgba(0,188,212,0.15) 0%,transparent 68%);animation:navGlow 2s infinite;pointer-events:none}
 @keyframes navGlow{0%,100%{opacity:0.4;transform:scale(1)}50%{opacity:1;transform:scale(1.25)}}
 .accuracy-circle{border-radius:50%;background:rgba(0,188,212,0.06);border:1px solid rgba(0,188,212,0.1)}
 
 /* ── BOTÓN NORTE / ORIENTACIÓN ── */
-.btn-north{display:none}
-
-
+.btn-north{position:fixed;top:16px;right:16px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.92);border:2px solid rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;z-index:999;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.12);transition:all 0.25s}
+.btn-north.active{background:rgba(0,188,212,0.12);border-color:rgba(0,188,212,0.5)}
+.btn-north .compass-needle{font-size:22px;display:inline-block;transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1)}
 /* Badge informativo */
 .north-badge{position:fixed;top:68px;right:68px;background:rgba(0,0,0,0.72);color:white;font-size:10px;font-weight:700;letter-spacing:1.2px;padding:4px 10px;border-radius:12px;z-index:999;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
 .north-badge.show{opacity:1}
 
 /* ── TEMA OSCURO para botón norte ── */
-
+.dark .btn-north{background:rgba(26,29,35,0.95);border-color:rgba(255,255,255,0.1)}
 
 /* ── SPEED CIRCLE ── */
-.hamburger-btn{position:fixed;top:16px;left:16px;width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,0.95);border:1px solid rgba(0,0,0,0.08);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;z-index:999;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.12)}
-.hamburger-btn span{width:18px;height:2px;background:#222;border-radius:2px;display:block}
-.dark .hamburger-btn{background:rgba(26,29,35,0.95);border-color:rgba(255,255,255,0.1)}
-.dark .hamburger-btn span{background:white}
-.hamburger-menu{position:fixed;top:0;left:0;bottom:0;width:280px;background:white;z-index:1100;display:none;flex-direction:column;box-shadow:4px 0 24px rgba(0,0,0,0.15);animation:menuSlideIn 0.25s ease}
-@keyframes menuSlideIn{from{transform:translateX(-100%)}to{transform:translateX(0)}}
-.hamburger-menu.open{display:flex}
-.hamburger-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:1099;display:none}
-.hamburger-overlay.open{display:block}
-.menu-header{padding:48px 20px 20px;background:#f56a00;color:white}
-.menu-title{font-size:20px;font-weight:800;letter-spacing:0.5px}
-.menu-subtitle{font-size:12px;opacity:0.8;margin-top:2px}
-.menu-items{flex:1;padding:8px 0;overflow-y:auto}
-.menu-item{display:flex;align-items:center;gap:14px;padding:14px 20px;cursor:pointer;font-size:14px;font-weight:600;color:#333;border-bottom:1px solid rgba(0,0,0,0.04)}
-.menu-item:active{background:rgba(245,106,0,0.06)}
-.menu-item-icon{font-size:20px;width:28px;text-align:center}
-.dark .hamburger-menu{background:#1e2128}
-.dark .menu-item{color:rgba(255,255,255,0.85);border-color:rgba(255,255,255,0.05)}
-.speed-circle{position:fixed;bottom:90px;left:16px;width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.95);border:3px solid rgba(0,0,0,0.08);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;box-shadow:0 2px 12px rgba(0,0,0,0.15)}
+.speed-circle{position:fixed;bottom:170px;left:16px;width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.95);border:3px solid rgba(0,0,0,0.08);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;box-shadow:0 2px 12px rgba(0,0,0,0.15)}
 .speed-val{font-size:24px;font-weight:800;color:#222;line-height:1}
 .speed-unit{font-size:8px;color:#888;font-weight:600;letter-spacing:1px}
 
@@ -165,37 +147,10 @@ body.dark{background:#1a1d23}
 </head>
 <body>
 
-<!-- Hamburger button -->
-<div class="hamburger-btn" onclick="openMenu()">
-  <span></span><span></span><span></span>
-</div>
-
-<!-- Overlay -->
-<div class="hamburger-overlay" id="menuOverlay" onclick="closeMenu()"></div>
-
-<!-- Slide menu -->
-<div class="hamburger-menu" id="hamburgerMenu">
-  <div class="menu-header">
-    <div class="menu-title">🗺️ Ubify GPS</div>
-    <div class="menu-subtitle" id="menuAgentName">Agente</div>
-  </div>
-  <div class="menu-items">
-    <div class="menu-item" onclick="closeMenu();toggleTheme()">
-      <span class="menu-item-icon">🌓</span> Modo claro / oscuro
-    </div>
-    <div class="menu-item" onclick="closeMenu();recenter()">
-      <span class="menu-item-icon">🎯</span> Centrar en mi posición
-    </div>
-    <div class="menu-item" onclick="closeMenu();if(window.Android&&window.Android.goBack)window.Android.goBack()">
-      <span class="menu-item-icon">◀</span> Volver
-    </div>
-  </div>
-</div>
-
 <div class="speed-circle"><div class="speed-val" id="speedVal">0</div><div class="speed-unit">km/h</div></div>
 <div class="btn-theme" id="btnThemeMap" onclick="toggleTheme()">🌙</div>
-
-
+<div class="btn-north" id="btnNorth" onclick="toggleNorthLock()"><span class="compass-needle" id="compassNeedle">🧭</span></div>
+<div class="north-badge" id="northBadge"></div>
 <div id="map"></div>
 
 <!-- Nav top bar (during active nav) -->
@@ -317,12 +272,12 @@ function toggleTheme() {
 let userMarker = null, accuracyCircle = null;
 let userLat = 0, userLng = 0, heading = 0, smoothHeading = 0;
 let isFollowing  = true;
-const northLocked = true;  // SIEMPRE: cursor arriba, mapa rota con heading
+let northLocked  = true;   // TRUE = norte fijo (cursor arriba, mapa rota) — DEFAULT
 let mapPaneAngle = 0;      // ángulo actual de rotación del mapa
 
 // SVG del cursor — siempre apunta arriba, nunca rota
 const CURSOR_SVG = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="36" height="36" class="nav-arrow-svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="28" height="28" class="nav-arrow-svg">
   <defs>
     <filter id="cshadow"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/></filter>
     <radialGradient id="cgrad" cx="50%" cy="40%" r="60%">
@@ -390,8 +345,8 @@ function updateUserPosition(lat, lng, accuracy, speed, hdg) {
       icon: L.divIcon({
         className: 'nav-arrow-wrap',
         html: `<div class="nav-glow"></div>${CURSOR_SVG}`,
-        iconSize:   [36, 36],
-        iconAnchor: [18, 18]
+        iconSize:   [28, 28],
+        iconAnchor: [14, 14]
       }),
       zIndexOffset: 1000,
       interactive: false
@@ -778,16 +733,6 @@ function stopNavigation() {
 // ═══════════════════════════════════════════════════════════
 // UTILS
 // ═══════════════════════════════════════════════════════════
-// ── MENÚ HAMBURGUESA ──
-function openMenu() {
-  document.getElementById('hamburgerMenu').classList.add('open');
-  document.getElementById('menuOverlay').classList.add('open');
-}
-function closeMenu() {
-  document.getElementById('hamburgerMenu').classList.remove('open');
-  document.getElementById('menuOverlay').classList.remove('open');
-}
-
 function haversine(lat1,lon1,lat2,lon2) {
   const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
   const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;

@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -17,7 +16,7 @@ body.light #map{background:#e8e0d5}
 .leaflet-control-zoom,.leaflet-control-attribution{display:none!important}
 
 /* ── CURSOR ── */
-.nav-wrap{position:relative;width:40px;height:46px;filter:drop-shadow(0 2px 7px rgba(0,0,0,0.5))}
+.nav-wrap{position:relative;width:40px;height:46px;filter:drop-shadow(0 2px 7px rgba(0,0,0,0.5));transform-origin:19px 22px;will-change:transform}
 .nav-glow{position:absolute;inset:-14px;border-radius:50%;background:radial-gradient(circle,rgba(0,188,212,0.22) 0%,transparent 65%);animation:glow 2s ease-in-out infinite;pointer-events:none}
 @keyframes glow{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.9;transform:scale(1.3)}}
 
@@ -437,6 +436,11 @@ function ensureBearingWrap(){
 function setMapBearing(deg){
   const w=ensureBearingWrap();
   if(w) w.style.transform=`rotate(${deg}deg)`;
+  // Contra-rotar el marcador para que la punta siempre apunte arriba en pantalla
+  if(userMarker){
+    const el=userMarker.getElement();
+    if(el) el.style.transform=`rotate(${-deg}deg)`;
+  }
 }
 
 function updateUserPosition(lat,lng,accuracy,speed,hdg){
@@ -623,16 +627,33 @@ function updateFloatingButtons(){
 }
 
 // Helper: calcula la LatLng objetivo para que el cursor quede al 75% del área visible
+// Corrige ambos ejes (X e Y) desrotando el offset según el bearing actual del mapa
 function getOffsetCenter(lat,lng){
   const bar=document.getElementById('bottomBar');
   const barH=bar?bar.offsetHeight:0;
   const mapH=map.getContainer().offsetHeight;
-  const visibleH=mapH-barH; // área libre sobre la barra
-  const targetY=visibleH*0.75; // 75% del área visible
+  const mapW=map.getContainer().offsetWidth;
+  const visibleH=mapH-barH;
+
+  // Posición destino en pantalla: centro horizontal, 75% del área visible
+  const targetX=mapW/2;
+  const targetY=visibleH*0.75;
+
+  // Posición actual del cursor en coordenadas de pantalla (sin rotación aplicada)
   const cursorPt=map.latLngToContainerPoint([lat,lng]);
-  const offsetY=targetY-cursorPt.y;
+
+  // Diferencia en píxeles de pantalla (espacio rotado)
+  const dxScreen=targetX-cursorPt.x;
+  const dyScreen=targetY-cursorPt.y;
+
+  // Des-rotar el offset de pantalla al espacio del mapa (inverso de -curH)
+  const rad=curH*Math.PI/180; // curH es el bearing real en grados
+  const dxMap= dxScreen*Math.cos(rad)+dyScreen*Math.sin(rad);
+  const dyMap=-dxScreen*Math.sin(rad)+dyScreen*Math.cos(rad);
+
+  // Aplicar el offset en espacio de mapa sobre el centro actual
   const centerPt=map.latLngToContainerPoint(map.getCenter());
-  return map.containerPointToLatLng(L.point(centerPt.x,centerPt.y-offsetY));
+  return map.containerPointToLatLng(L.point(centerPt.x-dxMap,centerPt.y-dyMap));
 }
 // Observer para detectar cambios de altura en la barra
 const _barObs=new ResizeObserver(()=>updateFloatingButtons());

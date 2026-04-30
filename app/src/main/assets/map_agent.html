@@ -458,12 +458,15 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
   }
   setMapBearing(-curH);
   if(isFollowing&&userLat){
-    // Calcular offset para que el cursor quede centrado en el área visible libre
     const bar=document.getElementById('bottomBar');
     const barH=bar?bar.offsetHeight:0;
+    // CURSOR_OFFSET: fracción de barH que se desplaza el mapa hacia abajo.
+    // 0 = cursor en centro geométrico, 1 = cursor pegado al borde de la barra.
+    // ~0.72 coloca el cursor justo encima de los íconos flotantes (estilo Waze).
+    const CURSOR_OFFSET=0.72;
     if(barH>0&&map.getContainer()){
       const centerPt=map.latLngToContainerPoint([lat,lng]);
-      const targetPt=L.point(centerPt.x,centerPt.y+barH/2);
+      const targetPt=L.point(centerPt.x,centerPt.y+barH*CURSOR_OFFSET);
       const targetLatLng=map.containerPointToLatLng(targetPt);
       map.panTo(targetLatLng,{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
     } else {
@@ -479,9 +482,10 @@ function recenter(){
   if(!userLat)return;
   const bar=document.getElementById('bottomBar');
   const barH=bar?bar.offsetHeight:0;
+  const CURSOR_OFFSET=0.72;
   if(barH>0&&map.getContainer()){
     const centerPt=map.latLngToContainerPoint([userLat,userLng]);
-    const targetPt=L.point(centerPt.x,centerPt.y+barH/2);
+    const targetPt=L.point(centerPt.x,centerPt.y+barH*CURSOR_OFFSET);
     const targetLatLng=map.containerPointToLatLng(targetPt);
     map.flyTo(targetLatLng,17,{duration:0.5});
   } else {
@@ -639,20 +643,12 @@ function updateFloatingButtons(){
 }
 
 function updateMapPadding(barH){
-  // paddingBottomLeft desplaza el centro del mapa hacia arriba
-  // para que el punto de seguimiento quede en el centro del área libre
   if(!map)return;
-  const ph=barH||0;
-  // Aplicar padding al mapa (Leaflet lo usa en flyTo/panTo con padding)
-  map._mapPaddingBottom=ph;
-  // Si estamos siguiendo al usuario, re-panear inmediatamente para reencuadrar
+  const CURSOR_OFFSET=0.72;
+  map._mapPaddingBottom=barH||0;
   if(isFollowing&&userLat){
-    const mapH=map.getContainer().offsetHeight;
-    const visibleCenterY=mapH-ph/2; // centro del área visible libre
-    const offsetPx=ph/2; // cuántos px subir el punto respecto al centro geométrico
-    // Convertir el offset en grados usando la escala actual del mapa
     const centerPt=map.latLngToContainerPoint([userLat,userLng]);
-    const targetPt=L.point(centerPt.x,centerPt.y+offsetPx);
+    const targetPt=L.point(centerPt.x,centerPt.y+(barH||0)*CURSOR_OFFSET);
     const targetLatLng=map.containerPointToLatLng(targetPt);
     map.panTo(targetLatLng,{animate:true,duration:0.35,easeLinearity:0.5,noMoveStart:true});
   }

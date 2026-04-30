@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -428,7 +429,7 @@ function ensureBearingWrap(){
   const pane=document.querySelector('#map .leaflet-map-pane');
   if(!pane)return null;
   _bWrap=document.createElement('div');
-  _bWrap.style.cssText='position:absolute;inset:0;transform-origin:50% 50%;will-change:transform;transition:transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94);';
+  _bWrap.style.cssText='position:absolute;inset:0;transform-origin:50% 50%;will-change:transform;';
   pane.parentNode.insertBefore(_bWrap,pane);
   _bWrap.appendChild(pane);
   return _bWrap;
@@ -622,24 +623,16 @@ function updateFloatingButtons(){
 }
 
 // Helper: calcula la LatLng objetivo para que el cursor quede al 75% del área visible
-// Compensa el bearing del mapa para que el offset se aplique en la dirección correcta
 function getOffsetCenter(lat,lng){
   const bar=document.getElementById('bottomBar');
-  const navTopEl=document.getElementById('navTop');
   const barH=bar?bar.offsetHeight:0;
-  const topH=(navTopEl&&navTopEl.classList.contains('active'))?navTopEl.offsetHeight:0;
   const mapH=map.getContainer().offsetHeight;
-  const visibleH=mapH-barH-topH;
-  // El cursor debe estar al 72% del área visible (más abajo que el centro, igual que Waze)
-  const targetY=topH+visibleH*0.72;
+  const visibleH=mapH-barH; // área libre sobre la barra
+  const targetY=visibleH*0.75; // 75% del área visible
   const cursorPt=map.latLngToContainerPoint([lat,lng]);
-  const offsetPxY=targetY-cursorPt.y; // cuánto hay que mover en pantalla
-  // Compensar bearing: rotar el vector de offset para que sea correcto en el mapa rotado
-  const bearingRad=(-curH)*Math.PI/180;
-  const offsetX=-offsetPxY*Math.sin(bearingRad);
-  const offsetY=-offsetPxY*Math.cos(bearingRad);
+  const offsetY=targetY-cursorPt.y;
   const centerPt=map.latLngToContainerPoint(map.getCenter());
-  return map.containerPointToLatLng(L.point(centerPt.x-offsetX,centerPt.y-offsetY));
+  return map.containerPointToLatLng(L.point(centerPt.x,centerPt.y-offsetY));
 }
 // Observer para detectar cambios de altura en la barra
 const _barObs=new ResizeObserver(()=>updateFloatingButtons());
@@ -725,10 +718,7 @@ function startActiveNav(){
   collapseSearchPanel();
   document.getElementById('navPanel').classList.add('active');
   isFollowing=true;
-  // Aumentar zoom sin resetear bearing — el panTo con bearing lo maneja updateUserPosition
-  map.setZoom(18,{animate:true});
-  // Aplicar bearing actual inmediatamente
-  setMapBearing(-curH);
+  map.flyTo([userLat,userLng],18,{duration:0.8});
   updateNavInfo();
 }
 function updateNavInfo(){
@@ -751,11 +741,7 @@ function stopNavigation(){
   document.getElementById('navPanel').classList.remove('active');
   document.getElementById('routeSheet').classList.remove('active');
   document.getElementById('searchPanel').style.display='';
-  // Resetear mapa al norte al salir de navegación
-  setMapBearing(0);
-  isFollowing=true;
-  map.setZoom(16,{animate:true});
-  if(userLat)map.panTo(getOffsetCenter(userLat,userLng),{animate:true,duration:0.5});
+  isFollowing=true;recenter();
 }
 
 // ═══ MENÚ ═══
@@ -777,3 +763,4 @@ setTimeout(()=>{if(!USER_ID)initFirebase();},1500);
 </script>
 </body>
 </html>
+

@@ -29,12 +29,12 @@ body.light #map{background:#e8e0d5}
 .fab{width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
 .fab svg{width:26px;height:26px}
 /* fab-alert: mismo glassmorphism que el velocímetro */
-.fab-alert{position:fixed;bottom:185px;right:14px;z-index:800;width:72px;height:72px;border-radius:50%;background:rgba(20,26,38,0.72);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border:1.5px solid rgba(255,255,255,0.10);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.45),inset 0 1px 0 rgba(255,255,255,0.07);overflow:hidden}
+.fab-alert{position:fixed;bottom:185px;right:14px;z-index:800;width:72px;height:72px;border-radius:50%;background:rgba(20,26,38,0.72);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border:1.5px solid rgba(255,255,255,0.10);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.45),inset 0 1px 0 rgba(255,255,255,0.07);overflow:hidden;transition:bottom .3s cubic-bezier(.4,0,.2,1)}
 .fab-alert svg{width:32px;height:32px}
 .light .fab-alert{background:rgba(255,255,255,0.55);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border-color:rgba(255,255,255,0.6);box-shadow:0 4px 16px rgba(0,0,0,0.15),inset 0 1px 0 rgba(255,255,255,0.8)}
 
 /* ── VELOCÍMETRO ── */
-.speedometer{position:fixed;bottom:185px;left:14px;z-index:800;width:72px;height:72px;cursor:default;border-radius:50%;overflow:hidden;transition:transform .18s ease}
+.speedometer{position:fixed;bottom:185px;left:14px;z-index:800;width:72px;height:72px;cursor:default;border-radius:50%;overflow:hidden;transition:bottom .3s cubic-bezier(.4,0,.2,1),transform .18s ease}
 .speedometer.recenter-mode{cursor:pointer;transform:scale(1.05)}
 .recenter-icon{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease}
 .recenter-icon svg{width:32px;height:32px}
@@ -59,9 +59,9 @@ body.light #map{background:#e8e0d5}
 .bottom-bar{position:fixed;bottom:0;left:0;right:0;z-index:900}
 
 /* Panel búsqueda */
-.search-panel{background:rgba(20,24,33,0.97);backdrop-filter:blur(16px);padding:8px 14px 20px}
+.search-panel{background:rgba(20,24,33,0.97);backdrop-filter:blur(16px);padding:8px 14px 14px}
 .sh{width:36px;height:4px;background:rgba(255,255,255,0.13);border-radius:2px;margin:0 auto 10px}
-.search-row{display:flex;align-items:center;background:rgba(255,255,255,0.07);border-radius:30px;padding:0 16px;border:1px solid rgba(255,255,255,0.07)}
+.search-row{display:flex;align-items:center;background:rgba(255,255,255,0.07);border-radius:30px;padding:0 16px;border:1px solid rgba(255,255,255,0.07);margin-bottom:0}
 .si{color:rgba(255,255,255,0.38);font-size:17px;margin-right:10px}
 .search-input{flex:1;background:none;border:none;color:white;font-size:15px;padding:13px 0;outline:none}
 .search-input::placeholder{color:rgba(255,255,255,0.32)}
@@ -95,7 +95,7 @@ body.light #map{background:#e8e0d5}
 .nav-recenter{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:14px}
 
 /* ── POPUP CLIENTE ── */
-.client-popup{position:fixed;bottom:145px;left:12px;right:12px;background:rgba(20,24,33,0.97);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.07);border-radius:18px;padding:18px;z-index:1000;display:none;box-shadow:0 8px 36px rgba(0,0,0,0.6)}
+.client-popup{position:fixed;bottom:145px;left:12px;right:12px;background:rgba(20,24,33,0.97);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.07);border-radius:18px;padding:18px;z-index:1000;display:none;box-shadow:0 8px 36px rgba(0,0,0,0.6);transition:bottom .3s cubic-bezier(.4,0,.2,1)}
 .client-popup.visible{display:block;animation:popUp .22s ease}
 @keyframes popUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .popup-name{font-size:16px;font-weight:800;color:white;margin-bottom:3px}
@@ -253,13 +253,15 @@ body.light{background:#e8e0d5}
   <!-- Búsqueda -->
   <div class="search-panel" id="searchPanel">
     <div class="swipe-handle" id="swipeHandle"><div class="sh-inner"></div></div>
+    <!-- La barra de búsqueda siempre visible -->
+    <div class="search-row" style="margin:0 0 0 0">
+      <span class="si">🔍</span>
+      <input class="search-input" id="searchInput" type="text" placeholder="¿Adónde vas?" oninput="searchClients(this.value)" onfocus="expandSearchPanelFull()">
+      <span class="sm">🎤</span>
+    </div>
+    <!-- Contenido colapsable: quick tabs + resultados -->
     <div class="search-panel-inner hidden" id="searchPanelInner">
       <div style="padding:0 0 4px">
-      <div class="search-row">
-        <span class="si">🔍</span>
-        <input class="search-input" id="searchInput" type="text" placeholder="¿Adónde vas?" oninput="searchClients(this.value)" onfocus="expandSearchPanelFull()">
-        <span class="sm">🎤</span>
-      </div>
       <div class="quick-tabs">
         <div class="qt" onclick="centerOnUser()"><div class="qt-ic">🏠</div><div class="qt-lb">Casa</div></div>
         <div class="qt" onclick="centerOnUser()"><div class="qt-ic">💼</div><div class="qt-lb">Trabajo</div></div>
@@ -518,11 +520,13 @@ function expandSearchPanel(){
     document.getElementById('searchPanelInner').className='search-panel-inner shown';
     document.getElementById('resultsList').innerHTML=''; // solo quick tabs en nivel 1
   }
+  setTimeout(updateFloatingButtons,320);
 }
 function expandSearchPanelFull(){
   panelExpanded=true;panelFull=true;
   document.getElementById('searchPanelInner').className='search-panel-inner shown-full';
   renderNearby();
+  setTimeout(updateFloatingButtons,320);
 }
 function collapseSearchPanel(){
   panelExpanded=false;panelFull=false;
@@ -530,6 +534,7 @@ function collapseSearchPanel(){
   document.getElementById('searchInput').value='';
   document.getElementById('searchInput').blur();
   document.getElementById('resultsList').innerHTML='';
+  setTimeout(updateFloatingButtons,320);
 }
 
 const swipeEl=document.getElementById('swipeHandle');
@@ -591,7 +596,27 @@ function showPill(msg){
 function hidePill(){document.getElementById('proxPill').classList.remove('visible');}
 function dismissProxPill(){proxDismissed=true;hidePill();}
 
-setInterval(updateProxPill,5000);
+// ═══ ÍCONOS FLOTANTES — se adaptan a la altura de la barra inferior ═══
+function updateFloatingButtons(){
+  const bar=document.getElementById('bottomBar');
+  const barH=bar?bar.offsetHeight:0;
+  const GAP=16; // margen sobre la barra
+  const bottom=barH+GAP;
+  document.getElementById('speedometer').style.bottom=bottom+'px';
+  document.querySelector('.fab-alert').style.bottom=bottom+'px';
+  // También mover el client-popup si está visible
+  const popup=document.getElementById('clientPopup');
+  if(popup&&popup.classList.contains('visible')){
+    popup.style.bottom=(barH+8)+'px';
+  }
+}
+// Observer para detectar cambios de altura en la barra
+const _barObs=new ResizeObserver(()=>updateFloatingButtons());
+document.addEventListener('DOMContentLoaded',()=>{
+  const bar=document.getElementById('bottomBar');
+  if(bar)_barObs.observe(bar);
+  updateFloatingButtons();
+});
 // Cerrar panel al tocar el mapa
 
 function renderResults(items){
@@ -606,7 +631,10 @@ function showClientPopup(c){
   document.getElementById('popupName').textContent=c.nombre||'Cliente';
   const dist=userLat?hav(userLat,userLng,c.lat,c.lng):0;
   document.getElementById('popupAddr').textContent=[c.codigo&&`Cód: ${c.codigo}`,c.zona,c.telefono&&`📞 ${c.telefono}`,dist>0&&(dist<1?Math.round(dist*1000)+'m':dist.toFixed(1)+'km')].filter(Boolean).join(' · ');
-  document.getElementById('clientPopup').classList.add('visible');
+  const popup=document.getElementById('clientPopup');
+  const barH=document.getElementById('bottomBar')?.offsetHeight||145;
+  popup.style.bottom=(barH+8)+'px';
+  popup.classList.add('visible');
 }
 function closePopup(){document.getElementById('clientPopup').classList.remove('visible');selectedClient=null;}
 

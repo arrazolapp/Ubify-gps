@@ -16,7 +16,7 @@ body.light #map{background:#e8e0d5}
 .leaflet-control-zoom,.leaflet-control-attribution{display:none!important}
 
 /* ── CURSOR ── */
-.nav-wrap{position:relative;width:40px;height:46px;filter:drop-shadow(0 2px 7px rgba(0,0,0,0.5));transform-origin:19px 22px;will-change:transform}
+.nav-marker-wrap{background:none!important;border:none!important;overflow:visible!important} /* wrapper Leaflet neutro */
 .nav-glow{position:absolute;inset:-14px;border-radius:50%;background:radial-gradient(circle,rgba(0,188,212,0.22) 0%,transparent 65%);animation:glow 2s ease-in-out infinite;pointer-events:none}
 @keyframes glow{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.9;transform:scale(1.3)}}
 
@@ -408,7 +408,7 @@ function toggleTheme(){
 let userMarker=null,accuracyCircle=null;
 let userLat=0,userLng=0,curH=0,smoothH=0,isFollowing=true;
 
-const CURSOR=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="38" height="44">
+const CURSOR_SVG=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="38" height="44">
   <defs>
     <filter id="cs"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="rgba(0,0,0,0.4)"/></filter>
     <radialGradient id="cg" cx="50%" cy="38%" r="62%">
@@ -419,6 +419,9 @@ const CURSOR=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" widt
   <path d="M50 11 L87 88 Q87 96 76 96 Q64 96 50 89 Q36 96 24 96 Q13 96 13 88 Z" fill="url(#cg)"/>
   <path d="M50 11 L76 76 Q64 72 50 69 Q36 72 24 76 Z" fill="rgba(255,255,255,0.18)"/>
 </svg>`;
+// El marcador usa className vacío para que Leaflet no interfiera con el inner div
+// #cursorInner es el que rotamos para contra-restar la rotación del mapa
+const CURSOR=`<div id="cursorInner" style="width:40px;height:46px;transform-origin:19px 22px;will-change:transform;filter:drop-shadow(0 2px 7px rgba(0,0,0,0.5))"><div class="nav-glow"></div>${CURSOR_SVG}</div>`;
 
 function lerpAngle(a,b,t){let d=b-a;while(d>180)d-=360;while(d<-180)d+=360;return a+d*t;}
 
@@ -436,11 +439,9 @@ function ensureBearingWrap(){
 function setMapBearing(deg){
   const w=ensureBearingWrap();
   if(w) w.style.transform=`rotate(${deg}deg)`;
-  // Contra-rotar el marcador para que la punta siempre apunte arriba en pantalla
-  if(userMarker){
-    const el=userMarker.getElement();
-    if(el) el.style.transform=`rotate(${-deg}deg)`;
-  }
+  // Contra-rotar SOLO el inner div del cursor (no el wrapper que Leaflet posiciona)
+  const inner=document.getElementById('cursorInner');
+  if(inner) inner.style.transform=`rotate(${-deg}deg)`;
 }
 
 function updateUserPosition(lat,lng,accuracy,speed,hdg){
@@ -452,7 +453,7 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
 
   if(!userMarker){
     userMarker=L.marker([lat,lng],{
-      icon:L.divIcon({className:'nav-wrap',html:`<div class="nav-glow"></div>${CURSOR}`,iconSize:[38,44],iconAnchor:[19,22]}),
+      icon:L.divIcon({className:'nav-marker-wrap',html:CURSOR,iconSize:[40,46],iconAnchor:[20,23]}),
       zIndexOffset:1000,interactive:false
     }).addTo(map);
     accuracyCircle=L.circle([lat,lng],{radius:Math.min(accuracy||20,120),fillColor:'rgba(0,188,212,0.06)',fillOpacity:1,color:'rgba(0,188,212,0.2)',weight:1}).addTo(map);
@@ -626,34 +627,36 @@ function updateFloatingButtons(){
   }
 }
 
-// Helper: calcula la LatLng objetivo para que el cursor quede al 75% del área visible
-// Corrige ambos ejes (X e Y) desrotando el offset según el bearing actual del mapa
+// Helper: calcula el LatLng que debe ser el centro del mapa para que el cursor
+// aparezca centrado horizontalmente y al 75% del área visible sobre la barra.
+// Leaflet NO sabe de la rotación CSS — sus coordenadas son espacio no-rotado.
+// El truco: el offset visual deseado en pantalla se rota al espacio Leaflet (+curH).
 function getOffsetCenter(lat,lng){
   const bar=document.getElementById('bottomBar');
   const barH=bar?bar.offsetHeight:0;
   const mapH=map.getContainer().offsetHeight;
   const mapW=map.getContainer().offsetWidth;
+
+  // Offset deseado desde el centro geométrico del mapa al punto destino del cursor,
+  // expresado en píxeles de PANTALLA (espacio visual rotado).
+  // dxScreen=0: cursor siempre centrado horizontalmente.
+  // dyScreen: cursor a 75% del área visible, medido desde el centro del mapa.
   const visibleH=mapH-barH;
+  const dxScreen=0;
+  const dyScreen=(visibleH*0.75)-(mapH/2);
 
-  // Posición destino en pantalla: centro horizontal, 75% del área visible
-  const targetX=mapW/2;
-  const targetY=visibleH*0.75;
+  // Rotar el offset de pantalla al espacio Leaflet (inverso de la rotación CSS -curH).
+  // CSS aplica rotate(-curH), así que el espacio Leaflet está girado +curH respecto a pantalla.
+  const rad=curH*Math.PI/180;
+  const dxLeaflet= dxScreen*Math.cos(rad)-dyScreen*Math.sin(rad);
+  const dyLeaflet= dxScreen*Math.sin(rad)+dyScreen*Math.cos(rad);
 
-  // Posición actual del cursor en coordenadas de pantalla (sin rotación aplicada)
+  // El centro Leaflet que hace que el cursor quede en el destino visual:
   const cursorPt=map.latLngToContainerPoint([lat,lng]);
-
-  // Diferencia en píxeles de pantalla (espacio rotado)
-  const dxScreen=targetX-cursorPt.x;
-  const dyScreen=targetY-cursorPt.y;
-
-  // Des-rotar el offset de pantalla al espacio del mapa (inverso de -curH)
-  const rad=curH*Math.PI/180; // curH es el bearing real en grados
-  const dxMap= dxScreen*Math.cos(rad)+dyScreen*Math.sin(rad);
-  const dyMap=-dxScreen*Math.sin(rad)+dyScreen*Math.cos(rad);
-
-  // Aplicar el offset en espacio de mapa sobre el centro actual
-  const centerPt=map.latLngToContainerPoint(map.getCenter());
-  return map.containerPointToLatLng(L.point(centerPt.x-dxMap,centerPt.y-dyMap));
+  return map.containerPointToLatLng(L.point(
+    cursorPt.x - dxLeaflet,
+    cursorPt.y - dyLeaflet
+  ));
 }
 // Observer para detectar cambios de altura en la barra
 const _barObs=new ResizeObserver(()=>updateFloatingButtons());
@@ -784,4 +787,3 @@ setTimeout(()=>{if(!USER_ID)initFirebase();},1500);
 </script>
 </body>
 </html>
-

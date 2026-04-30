@@ -466,7 +466,7 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
   if(isFollowing&&userLat){
     map.panTo(getOffsetCenter(lat,lng),{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
   }
-  if(navActive&&navTarget)updateNavInfo();
+  if(navActive&&navTarget){updateNavInfo();checkRouteDeviation(lat,lng);}
 }
 
 function recenter(){
@@ -729,6 +729,7 @@ function onRouteResult(data){
   window._routeLineBg=L.polyline(coords,{color:'#C9A0F0',weight:12,opacity:0.45,lineJoin:'round',lineCap:'round'}).addTo(map);
   // Línea principal morada
   routeLine=L.polyline(coords,{color:'#7B2FBE',weight:7,opacity:0.95,lineJoin:'round',lineCap:'round'}).addTo(map);
+  _routeCoords=coords; // guardar para detección de desvío
   const km=route.distance/1000,min=Math.round(route.duration/60);
   document.getElementById('routeEta').textContent=`${min} min`;
   document.getElementById('routeDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
@@ -764,6 +765,8 @@ function updateNavInfo(){
 }
 function stopNavigation(){
   navActive=false;navTarget=null;
+  if(_recalcTimer){clearTimeout(_recalcTimer);_recalcTimer=null;}
+  _routeCoords=[];
   if(routeLine){map.removeLayer(routeLine);routeLine=null;}
   if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
   document.getElementById('navTop').classList.remove('active');
@@ -773,7 +776,91 @@ function stopNavigation(){
   isFollowing=true;recenter();
 }
 
-// ═══ MENÚ ═══
+// ═══ RECÁLCULO AUTOMÁTICO ═══
+let _recalcTimer=null;
+let _routeCoords=[];      // coords actuales de la ruta [[lat,lng],...]
+const RECALC_DIST_M=60;   // metros de desvío para disparar recálculo
+const RECALC_DELAY_MS=5000; // esperar 5s de desvío continuo antes de recalcular
+
+// Distancia mínima de un punto a un segmento de polyline (en metros)
+function distToRoute(lat,lng,coords){
+  if(!coords||coords.length<2)return Infinity;
+  let minD=Infinity;
+  for(let i=0;i<coords.length-1;i++){
+    const d=distPtSeg(lat,lng,coords[i][0],coords[i][1],coords[i+1][0],coords[i+1][1]);
+    if(d<minD)minD=d;
+  }
+  return minD;
+}
+function distPtSeg(px,py,ax,ay,bx,by){
+  // Proyección del punto P sobre el segmento AB, retorna distancia en metros
+  const R=6371000;
+  const toR=d=>d*Math.PI/180;
+  const dx=bx-ax,dy=by-ay;
+  if(dx===0&&dy===0)return hav(px,py,ax,ay)*1000;
+  const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy)));
+  return hav(px,py,ax+t*dx,ay+t*dy)*1000;
+}
+
+function checkRouteDeviation(lat,lng){
+  if(!navActive||!navTarget||!_routeCoords.length)return;
+  const d=distToRoute(lat,lng,_routeCoords);
+  if(d>RECALC_DIST_M){
+    if(!_recalcTimer){
+      _recalcTimer=setTimeout(()=>{
+        _recalcTimer=null;
+        if(navActive&&navTarget){
+          // Mostrar indicador
+          document.getElementById('navTopStreet').textContent='Recalculando ruta...';
+          document.getElementById('turnBox').textContent='🔄';
+          recalcRoute();
+        }
+      },RECALC_DELAY_MS);
+    }
+  } else {
+    // Está en la ruta — cancelar timer si existía
+    if(_recalcTimer){clearTimeout(_recalcTimer);_recalcTimer=null;}
+  }
+}
+
+async function recalcRoute(){
+  if(!navTarget||!userLat)return;
+  if(window.Android?.fetchRoute){
+    window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);
+    return;
+  }
+  const servers=['https://router.project-osrm.org','https://routing.openstreetmap.de/routed-car'];
+  for(const s of servers){
+    try{
+      const r=await fetch(`${s}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(8000)});
+      if(!r.ok)continue;
+      const d=await r.json();
+      if(d.routes?.[0]){applyRecalcRoute(d);return;}
+    }catch(e){continue;}
+  }
+  // Si falló, restaurar texto
+  if(navTarget)document.getElementById('navTopStreet').textContent=navTarget.nombre||'';
+}
+
+function applyRecalcRoute(data){
+  if(!data.routes?.[0])return;
+  const route=data.routes[0];
+  const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
+  _routeCoords=coords;
+  // Redibujar líneas
+  if(routeLine)map.removeLayer(routeLine);
+  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
+  window._routeLineBg=L.polyline(coords,{color:'#C9A0F0',weight:12,opacity:0.45,lineJoin:'round',lineCap:'round'}).addTo(map);
+  routeLine=L.polyline(coords,{color:'#7B2FBE',weight:7,opacity:0.95,lineJoin:'round',lineCap:'round'}).addTo(map);
+  // Actualizar info
+  const km=route.distance/1000,min=Math.round(route.duration/60);
+  document.getElementById('navTopDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
+  document.getElementById('navRemainTime').textContent=min<60?`${min} min`:`${Math.floor(min/60)}h ${min%60}m`;
+  document.getElementById('navRemainDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
+  const roads=(route.legs?.[0]?.steps||[]).filter(s=>s.name&&s.name.length>3&&s.distance>300).map(s=>s.name);
+  document.getElementById('navTopStreet').textContent=[...new Set(roads)].slice(0,2).join(' · ')||navTarget.nombre||'';
+  document.getElementById('turnBox').textContent='↑';
+}
 function toggleMenu(){const w=document.getElementById('menuWrap');w.style.display=w.style.display==='block'?'none':'block';}
 function closeMenu(){document.getElementById('menuWrap').style.display='none';}
 function reportAlert(){}

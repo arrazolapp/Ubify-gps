@@ -457,11 +457,37 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
     accuracyCircle.setLatLng([lat,lng]).setRadius(Math.min(accuracy||20,120));
   }
   setMapBearing(-curH);
-  if(isFollowing)map.panTo([lat,lng],{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
+  if(isFollowing&&userLat){
+    // Calcular offset para que el cursor quede centrado en el área visible libre
+    const bar=document.getElementById('bottomBar');
+    const barH=bar?bar.offsetHeight:0;
+    if(barH>0&&map.getContainer()){
+      const centerPt=map.latLngToContainerPoint([lat,lng]);
+      const targetPt=L.point(centerPt.x,centerPt.y+barH/2);
+      const targetLatLng=map.containerPointToLatLng(targetPt);
+      map.panTo(targetLatLng,{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
+    } else {
+      map.panTo([lat,lng],{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
+    }
+  }
   if(navActive&&navTarget)updateNavInfo();
 }
 
-function recenter(){isFollowing=true;document.getElementById('speedometer').classList.remove('recenter-mode');if(userLat)map.flyTo([userLat,userLng],17,{duration:0.5});}
+function recenter(){
+  isFollowing=true;
+  document.getElementById('speedometer').classList.remove('recenter-mode');
+  if(!userLat)return;
+  const bar=document.getElementById('bottomBar');
+  const barH=bar?bar.offsetHeight:0;
+  if(barH>0&&map.getContainer()){
+    const centerPt=map.latLngToContainerPoint([userLat,userLng]);
+    const targetPt=L.point(centerPt.x,centerPt.y+barH/2);
+    const targetLatLng=map.containerPointToLatLng(targetPt);
+    map.flyTo(targetLatLng,17,{duration:0.5});
+  } else {
+    map.flyTo([userLat,userLng],17,{duration:0.5});
+  }
+}
 function centerOnUser(){recenter();}
 function onSpeedometerClick(){if(!isFollowing)recenter();}
 map.on('dragstart',()=>{isFollowing=false;document.getElementById('speedometer').classList.add('recenter-mode');});
@@ -596,18 +622,39 @@ function showPill(msg){
 function hidePill(){document.getElementById('proxPill').classList.remove('visible');}
 function dismissProxPill(){proxDismissed=true;hidePill();}
 
-// ═══ ÍCONOS FLOTANTES — se adaptan a la altura de la barra inferior ═══
+// ═══ ÍCONOS FLOTANTES + REENCUADRE DEL MAPA ═══
 function updateFloatingButtons(){
   const bar=document.getElementById('bottomBar');
   const barH=bar?bar.offsetHeight:0;
-  const GAP=16; // margen sobre la barra
+  const GAP=16;
   const bottom=barH+GAP;
   document.getElementById('speedometer').style.bottom=bottom+'px';
   document.querySelector('.fab-alert').style.bottom=bottom+'px';
-  // También mover el client-popup si está visible
   const popup=document.getElementById('clientPopup');
   if(popup&&popup.classList.contains('visible')){
     popup.style.bottom=(barH+8)+'px';
+  }
+  // Reencuadrar el mapa: el cursor queda centrado en el área visible libre
+  updateMapPadding(barH);
+}
+
+function updateMapPadding(barH){
+  // paddingBottomLeft desplaza el centro del mapa hacia arriba
+  // para que el punto de seguimiento quede en el centro del área libre
+  if(!map)return;
+  const ph=barH||0;
+  // Aplicar padding al mapa (Leaflet lo usa en flyTo/panTo con padding)
+  map._mapPaddingBottom=ph;
+  // Si estamos siguiendo al usuario, re-panear inmediatamente para reencuadrar
+  if(isFollowing&&userLat){
+    const mapH=map.getContainer().offsetHeight;
+    const visibleCenterY=mapH-ph/2; // centro del área visible libre
+    const offsetPx=ph/2; // cuántos px subir el punto respecto al centro geométrico
+    // Convertir el offset en grados usando la escala actual del mapa
+    const centerPt=map.latLngToContainerPoint([userLat,userLng]);
+    const targetPt=L.point(centerPt.x,centerPt.y+offsetPx);
+    const targetLatLng=map.containerPointToLatLng(targetPt);
+    map.panTo(targetLatLng,{animate:true,duration:0.35,easeLinearity:0.5,noMoveStart:true});
   }
 }
 // Observer para detectar cambios de altura en la barra

@@ -28,13 +28,18 @@ body.light #map{background:#e8e0d5}
 .light .fab-menu span{background:#222}
 .fab{width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
 .fab svg{width:26px;height:26px}
-/* fab-alert: mismo look que el velocímetro */
-.fab-alert{position:fixed;bottom:185px;right:14px;z-index:800;width:72px;height:72px;border-radius:50%;background:rgba(20,26,38,0.72);backdrop-filter:blur(8px);border:1.5px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.5),inset 0 0 0 1px rgba(255,255,255,0.04);overflow:hidden}
-.fab-alert svg{width:34px;height:34px}
-.light .fab-alert{background:rgba(20,26,38,0.72);border-color:rgba(255,255,255,0.08)}
+/* fab-alert: mismo glassmorphism que el velocímetro */
+.fab-alert{position:fixed;bottom:185px;right:14px;z-index:800;width:72px;height:72px;border-radius:50%;background:rgba(20,26,38,0.72);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border:1.5px solid rgba(255,255,255,0.10);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.45),inset 0 1px 0 rgba(255,255,255,0.07);overflow:hidden}
+.fab-alert svg{width:32px;height:32px}
+.light .fab-alert{background:rgba(255,255,255,0.55);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border-color:rgba(255,255,255,0.6);box-shadow:0 4px 16px rgba(0,0,0,0.15),inset 0 1px 0 rgba(255,255,255,0.8)}
 
 /* ── VELOCÍMETRO ── */
-.speedometer{position:fixed;bottom:185px;left:14px;z-index:800;width:72px;height:72px;cursor:default;border-radius:50%;overflow:hidden}
+.speedometer{position:fixed;bottom:185px;left:14px;z-index:800;width:72px;height:72px;cursor:default;border-radius:50%;overflow:hidden;transition:transform .18s ease}
+.speedometer.recenter-mode{cursor:pointer;transform:scale(1.05)}
+.recenter-icon{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease}
+.recenter-icon svg{width:32px;height:32px}
+.speedometer.recenter-mode .speedo-inner{opacity:0;pointer-events:none}
+.speedometer.recenter-mode .recenter-icon{opacity:1;pointer-events:auto}
 .speedo-svg{position:absolute;top:0;left:0;width:72px;height:72px}
 .speedo-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .speed-val{font-size:27px;font-weight:900;color:white;line-height:1;text-shadow:0 1px 4px rgba(0,0,0,0.6)}
@@ -143,7 +148,11 @@ body.light #map{background:#e8e0d5}
 .sh-inner{width:36px;height:4px;background:rgba(255,255,255,0.18);border-radius:2px}
 .search-panel-inner{overflow:hidden;transition:max-height .3s ease}
 .search-panel-inner.hidden{max-height:0}
-.search-panel-inner.shown{max-height:400px}
+.search-panel-inner.shown{max-height:180px}
+.search-panel-inner.shown-full{max-height:400px}
+/* Separador de sección en el panel */
+.nearby-header{display:flex;align-items:center;gap:8px;padding:10px 2px 6px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase}
+.light .nearby-header{color:rgba(0,0,0,0.35)}
 
 /* ── LIGHT MODE ── */
 body.light{background:#e8e0d5}
@@ -204,7 +213,7 @@ body.light{background:#e8e0d5}
 </div>
 
 <!-- Velocímetro con tacómetro -->
-<div class="speedometer" id="speedometer">
+<div class="speedometer" id="speedometer" onclick="onSpeedometerClick()">
   <svg class="speedo-svg" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg" id="speedoSvg">
     <defs><filter id="segGlow"><feGaussianBlur stdDeviation="1.2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
     <circle cx="36" cy="36" r="34" fill="rgba(20,26,38,0.72)" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
@@ -213,6 +222,17 @@ body.light{background:#e8e0d5}
   <div class="speedo-inner">
     <div class="speed-val" id="speedVal">0</div>
     <div class="speed-unit">km/h</div>
+  </div>
+  <!-- Ícono de re-centrar (aparece al desplazar el mapa) -->
+  <div class="recenter-icon">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="12" r="3" fill="white"/>
+      <circle cx="12" cy="12" r="7" stroke="white" stroke-width="2" fill="none"/>
+      <line x1="12" y1="2" x2="12" y2="5" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      <line x1="12" y1="19" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      <line x1="2" y1="12" x2="5" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      <line x1="19" y1="12" x2="22" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    </svg>
   </div>
 </div>
 
@@ -237,7 +257,7 @@ body.light{background:#e8e0d5}
       <div style="padding:0 0 4px">
       <div class="search-row">
         <span class="si">🔍</span>
-        <input class="search-input" id="searchInput" type="text" placeholder="¿Adónde vas?" oninput="searchClients(this.value)" onfocus="expandSearchPanel()">
+        <input class="search-input" id="searchInput" type="text" placeholder="¿Adónde vas?" oninput="searchClients(this.value)" onfocus="expandSearchPanelFull()">
         <span class="sm">🎤</span>
       </div>
       <div class="quick-tabs">
@@ -439,9 +459,10 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
   if(navActive&&navTarget)updateNavInfo();
 }
 
-function recenter(){isFollowing=true;if(userLat)map.flyTo([userLat,userLng],17,{duration:0.5});}
+function recenter(){isFollowing=true;document.getElementById('speedometer').classList.remove('recenter-mode');if(userLat)map.flyTo([userLat,userLng],17,{duration:0.5});}
 function centerOnUser(){recenter();}
-map.on('dragstart',()=>{isFollowing=false;});
+function onSpeedometerClick(){if(!isFollowing)recenter();}
+map.on('dragstart',()=>{isFollowing=false;document.getElementById('speedometer').classList.add('recenter-mode');});
 map.on('click',()=>{closePopup();collapseSearchPanel();});
 function onGpsUpdate(lat,lng,accuracy,speed){updateUserPosition(lat,lng,accuracy,speed);}
 if(navigator.geolocation){
@@ -479,24 +500,32 @@ function initFirebase(){
 // ═══ BÚSQUEDA ═══
 function norm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 function searchClients(q){
-  expandSearchPanel();
+  expandSearchPanelFull();
   if(!q||q.length<2){renderNearby();return;}
   const qn=norm(q);
   renderResults(allClients.filter(c=>norm([c.nombre,c.codigo,c.direccion,c.zona].join(' ')).includes(qn)).map(c=>({...c,dist:userLat?hav(userLat,userLng,c.lat,c.lng):999})).sort((a,b)=>a.dist-b.dist).slice(0,30));
 }
 
 // ═══ SWIPE PANEL ═══
-let panelExpanded=false;
+let panelExpanded=false; // nivel 1: quick tabs visibles
+let panelFull=false;     // nivel 2: clientes cercanos visibles
 let swipeStartY=0,swipeCurY=0,swipeDragging=false;
 
 function expandSearchPanel(){
-  if(panelExpanded)return;
-  panelExpanded=true;
-  document.getElementById('searchPanelInner').className='search-panel-inner shown';
+  if(panelFull)return;
+  if(!panelExpanded){
+    panelExpanded=true;panelFull=false;
+    document.getElementById('searchPanelInner').className='search-panel-inner shown';
+    document.getElementById('resultsList').innerHTML=''; // solo quick tabs en nivel 1
+  }
+}
+function expandSearchPanelFull(){
+  panelExpanded=true;panelFull=true;
+  document.getElementById('searchPanelInner').className='search-panel-inner shown-full';
   renderNearby();
 }
 function collapseSearchPanel(){
-  panelExpanded=false;
+  panelExpanded=false;panelFull=false;
   document.getElementById('searchPanelInner').className='search-panel-inner hidden';
   document.getElementById('searchInput').value='';
   document.getElementById('searchInput').blur();
@@ -509,19 +538,30 @@ swipeEl.addEventListener('touchmove',e=>{if(!swipeDragging)return;swipeCurY=e.to
 swipeEl.addEventListener('touchend',()=>{
   if(!swipeDragging)return;swipeDragging=false;
   const dy=swipeStartY-swipeCurY; // positivo = swipe up
-  if(dy>25)expandSearchPanel();
-  else if(dy<-25)collapseSearchPanel();
+  if(dy>25){
+    if(!panelExpanded)expandSearchPanel();
+    else if(!panelFull)expandSearchPanelFull();
+  } else if(dy<-25){
+    if(panelFull)expandSearchPanel(); // bajar de nivel 2 a nivel 1
+    else collapseSearchPanel();       // bajar de nivel 1 a cerrado
+  }
 },{passive:true});
-// Click en el handle también expande/colapsa
-swipeEl.addEventListener('click',()=>{panelExpanded?collapseSearchPanel():expandSearchPanel();});
+// Click en el handle: sube un nivel o baja un nivel
+swipeEl.addEventListener('click',()=>{
+  if(!panelExpanded)expandSearchPanel();
+  else if(!panelFull)expandSearchPanelFull();
+  else collapseSearchPanel();
+});
 
-// ═══ CLIENTES CERCANOS (sin abrir panel) ═══
+// ═══ CLIENTES CERCANOS (nivel 2 del panel) ═══
 function renderNearby(){
   if(!allClients.length){document.getElementById('resultsList').innerHTML='';return;}
   if(!userLat){document.getElementById('resultsList').innerHTML=`<div style="text-align:center;color:rgba(255,255,255,0.35);padding:14px;font-size:13px">📍 ${allClients.length} clientes cargados</div>`;return;}
-  renderResults(allClients.map(c=>({...c,dist:hav(userLat,userLng,c.lat,c.lng)})).sort((a,b)=>a.dist-b.dist).slice(0,6));
+  const sorted=allClients.map(c=>({...c,dist:hav(userLat,userLng,c.lat,c.lng)})).sort((a,b)=>a.dist-b.dist).slice(0,8);
+  const header='<div class="nearby-header">📍 Clientes más cercanos</div>';
+  document.getElementById('resultsList').innerHTML=header+sorted.map(c=>`<div class="result-row" onclick="selectClient('${c.id}')"><div class="rpin">📍</div><div class="rinfo"><div class="rname">${c.nombre}</div><div class="rsub">${c.direccion||c.zona||c.codigo||''}</div></div><div class="rdist">${c.dist<1?Math.round(c.dist*1000)+'m':c.dist.toFixed(1)+'km'}</div></div>`).join('');
 }
-function showNearbyClients(){renderNearby();}// compatibilidad
+function showNearbyClients(){renderNearby();}
 
 // ═══ PROXIMITY PILL ═══
 let proxDismissed=false;

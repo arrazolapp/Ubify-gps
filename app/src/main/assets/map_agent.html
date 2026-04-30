@@ -28,9 +28,10 @@ body.light #map{background:#e8e0d5}
 .light .fab-menu span{background:#222}
 .fab{width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
 .fab svg{width:26px;height:26px}
-.fab-alert{position:fixed;bottom:185px;right:14px;z-index:800;width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,0.55);backdrop-filter:blur(6px);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.18)}
-.fab-alert svg{width:40px;height:40px}
-.dark .fab-alert{background:rgba(40,44,56,0.95)}
+/* fab-alert: mismo look que el velocímetro */
+.fab-alert{position:fixed;bottom:185px;right:14px;z-index:800;width:72px;height:72px;border-radius:50%;background:rgba(20,26,38,0.72);backdrop-filter:blur(8px);border:1.5px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.5),inset 0 0 0 1px rgba(255,255,255,0.04);overflow:hidden}
+.fab-alert svg{width:34px;height:34px}
+.light .fab-alert{background:rgba(20,26,38,0.72);border-color:rgba(255,255,255,0.08)}
 
 /* ── VELOCÍMETRO ── */
 .speedometer{position:fixed;bottom:185px;left:14px;z-index:800;width:72px;height:72px;cursor:default;border-radius:50%;overflow:hidden}
@@ -117,6 +118,33 @@ body.light #map{background:#e8e0d5}
 .rb-go{background:#4a90d9;color:white}
 .rb-cancel{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.6)}
 
+/* ── PROXIMITY PILL (reemplaza lista automática) ── */
+.prox-pill{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:850;
+  background:rgba(20,26,38,0.88);backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.1);border-radius:30px;
+  padding:8px 16px;display:none;align-items:center;gap:8px;
+  max-width:calc(100% - 140px);overflow:hidden;
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);animation:pillIn .3s ease}
+.prox-pill.visible{display:flex}
+@keyframes pillIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.prox-dot{width:8px;height:8px;border-radius:50%;background:#f56a00;flex-shrink:0;animation:proxPulse 1.5s ease-in-out infinite}
+@keyframes proxPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.75)}}
+.prox-scroll-wrap{overflow:hidden;flex:1;position:relative;height:18px}
+.prox-text{white-space:nowrap;font-size:13px;font-weight:600;color:rgba(255,255,255,0.9);
+  position:absolute;animation:proxScroll linear infinite}
+@keyframes proxScroll{0%{transform:translateX(60px)}100%{transform:translateX(-100%)}}
+.prox-close{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,0.08);
+  border:none;color:rgba(255,255,255,0.4);font-size:11px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0}
+
+/* ── SWIPE HANDLE del bottom-bar ── */
+.swipe-handle{height:22px;width:100%;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none}
+.swipe-handle:active{cursor:grabbing}
+.sh-inner{width:36px;height:4px;background:rgba(255,255,255,0.18);border-radius:2px}
+.search-panel-inner{overflow:hidden;transition:max-height .3s ease}
+.search-panel-inner.hidden{max-height:0}
+.search-panel-inner.shown{max-height:400px}
+
 /* ── LIGHT MODE ── */
 body.light{background:#e8e0d5}
 .light .speedometer{background:transparent;box-shadow:none}
@@ -149,6 +177,13 @@ body.light{background:#e8e0d5}
 <body>
 
 <div id="map"></div>
+
+<!-- Proximity pill (aparece arriba cuando hay cliente cercano) -->
+<div class="prox-pill" id="proxPill">
+  <div class="prox-dot"></div>
+  <div class="prox-scroll-wrap"><span class="prox-text" id="proxText"></span></div>
+  <button class="prox-close" onclick="dismissProxPill()">✕</button>
+</div>
 
 <!-- FABs derecha -->
 <!-- Hamburguesa izquierda (estilo Waze) -->
@@ -194,21 +229,25 @@ body.light{background:#e8e0d5}
 </div>
 
 <!-- Barra inferior -->
-<div class="bottom-bar">
+<div class="bottom-bar" id="bottomBar">
   <!-- Búsqueda -->
   <div class="search-panel" id="searchPanel">
-    <div class="sh"></div>
-    <div class="search-row">
-      <span class="si">🔍</span>
-      <input class="search-input" id="searchInput" type="text" placeholder="¿Adónde vas?" oninput="searchClients(this.value)">
-      <span class="sm">🎤</span>
+    <div class="swipe-handle" id="swipeHandle"><div class="sh-inner"></div></div>
+    <div class="search-panel-inner hidden" id="searchPanelInner">
+      <div style="padding:0 0 4px">
+      <div class="search-row">
+        <span class="si">🔍</span>
+        <input class="search-input" id="searchInput" type="text" placeholder="¿Adónde vas?" oninput="searchClients(this.value)" onfocus="expandSearchPanel()">
+        <span class="sm">🎤</span>
+      </div>
+      <div class="quick-tabs">
+        <div class="qt" onclick="centerOnUser()"><div class="qt-ic">🏠</div><div class="qt-lb">Casa</div></div>
+        <div class="qt" onclick="centerOnUser()"><div class="qt-ic">💼</div><div class="qt-lb">Trabajo</div></div>
+        <div class="qt qt-new"><div class="qt-ic" style="font-size:15px;font-weight:800;color:#4a90d9">＋</div><div class="qt-lb">Nuevo</div></div>
+      </div>
+      <div class="results-list" id="resultsList"></div>
+      </div>
     </div>
-    <div class="quick-tabs">
-      <div class="qt" onclick="centerOnUser()"><div class="qt-ic">🏠</div><div class="qt-lb">Casa</div></div>
-      <div class="qt" onclick="centerOnUser()"><div class="qt-ic">💼</div><div class="qt-lb">Trabajo</div></div>
-      <div class="qt qt-new"><div class="qt-ic" style="font-size:15px;font-weight:800;color:#4a90d9">＋</div><div class="qt-lb">Nuevo</div></div>
-    </div>
-    <div class="results-list" id="resultsList"></div>
   </div>
   <!-- Navegación activa -->
   <div class="nav-panel" id="navPanel">
@@ -403,7 +442,7 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
 function recenter(){isFollowing=true;if(userLat)map.flyTo([userLat,userLng],17,{duration:0.5});}
 function centerOnUser(){recenter();}
 map.on('dragstart',()=>{isFollowing=false;});
-map.on('click',()=>{closePopup();collapseSearch();});
+map.on('click',()=>{closePopup();collapseSearchPanel();});
 function onGpsUpdate(lat,lng,accuracy,speed){updateUserPosition(lat,lng,accuracy,speed);}
 if(navigator.geolocation){
   navigator.geolocation.watchPosition(
@@ -440,22 +479,88 @@ function initFirebase(){
 // ═══ BÚSQUEDA ═══
 function norm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 function searchClients(q){
-  if(!q||q.length<2){showNearbyClients();return;}
+  expandSearchPanel();
+  if(!q||q.length<2){renderNearby();return;}
   const qn=norm(q);
   renderResults(allClients.filter(c=>norm([c.nombre,c.codigo,c.direccion,c.zona].join(' ')).includes(qn)).map(c=>({...c,dist:userLat?hav(userLat,userLng,c.lat,c.lng):999})).sort((a,b)=>a.dist-b.dist).slice(0,30));
 }
-function showNearbyClients(){
+
+// ═══ SWIPE PANEL ═══
+let panelExpanded=false;
+let swipeStartY=0,swipeCurY=0,swipeDragging=false;
+
+function expandSearchPanel(){
+  if(panelExpanded)return;
+  panelExpanded=true;
+  document.getElementById('searchPanelInner').className='search-panel-inner shown';
+  renderNearby();
+}
+function collapseSearchPanel(){
+  panelExpanded=false;
+  document.getElementById('searchPanelInner').className='search-panel-inner hidden';
+  document.getElementById('searchInput').value='';
+  document.getElementById('searchInput').blur();
+  document.getElementById('resultsList').innerHTML='';
+}
+
+const swipeEl=document.getElementById('swipeHandle');
+swipeEl.addEventListener('touchstart',e=>{swipeDragging=true;swipeStartY=e.touches[0].clientY;},{passive:true});
+swipeEl.addEventListener('touchmove',e=>{if(!swipeDragging)return;swipeCurY=e.touches[0].clientY;},{passive:true});
+swipeEl.addEventListener('touchend',()=>{
+  if(!swipeDragging)return;swipeDragging=false;
+  const dy=swipeStartY-swipeCurY; // positivo = swipe up
+  if(dy>25)expandSearchPanel();
+  else if(dy<-25)collapseSearchPanel();
+},{passive:true});
+// Click en el handle también expande/colapsa
+swipeEl.addEventListener('click',()=>{panelExpanded?collapseSearchPanel():expandSearchPanel();});
+
+// ═══ CLIENTES CERCANOS (sin abrir panel) ═══
+function renderNearby(){
   if(!allClients.length){document.getElementById('resultsList').innerHTML='';return;}
   if(!userLat){document.getElementById('resultsList').innerHTML=`<div style="text-align:center;color:rgba(255,255,255,0.35);padding:14px;font-size:13px">📍 ${allClients.length} clientes cargados</div>`;return;}
   renderResults(allClients.map(c=>({...c,dist:hav(userLat,userLng,c.lat,c.lng)})).sort((a,b)=>a.dist-b.dist).slice(0,6));
 }
+function showNearbyClients(){renderNearby();}// compatibilidad
+
+// ═══ PROXIMITY PILL ═══
+let proxDismissed=false;
+let lastProxId=null;
+const PROX_RADIUS=0.3; // km
+
+function updateProxPill(){
+  if(!userLat||!allClients.length)return;
+  const nearby=allClients.map(c=>({...c,dist:hav(userLat,userLng,c.lat,c.lng)})).sort((a,b)=>a.dist-b.dist);
+  const closest=nearby[0];
+  if(!closest||closest.dist>PROX_RADIUS){hidePill();lastProxId=null;proxDismissed=false;return;}
+  if(closest.id!==lastProxId){proxDismissed=false;lastProxId=closest.id;}
+  if(proxDismissed){return;}
+  const distTxt=closest.dist<0.1?`${Math.round(closest.dist*1000)}m`:`${closest.dist.toFixed(2)}km`;
+  const msg=`📍 Cerca: ${closest.nombre}  ·  ${distTxt}`;
+  showPill(msg);
+}
+function showPill(msg){
+  const pill=document.getElementById('proxPill');
+  const txt=document.getElementById('proxText');
+  txt.textContent=msg;
+  pill.classList.add('visible');
+  // Ajustar duración del scroll al largo del texto
+  const duration=Math.max(4,msg.length*0.22)+'s';
+  txt.style.animationDuration=duration;
+}
+function hidePill(){document.getElementById('proxPill').classList.remove('visible');}
+function dismissProxPill(){proxDismissed=true;hidePill();}
+
+setInterval(updateProxPill,5000);
+// Cerrar panel al tocar el mapa
+
 function renderResults(items){
   const el=document.getElementById('resultsList');
   if(!items.length){el.innerHTML='<div style="text-align:center;color:rgba(255,255,255,0.35);padding:14px;font-size:13px">Sin resultados</div>';return;}
   el.innerHTML=items.map(c=>`<div class="result-row" onclick="selectClient('${c.id}')"><div class="rpin">📍</div><div class="rinfo"><div class="rname">${c.nombre}</div><div class="rsub">${c.direccion||c.zona||c.codigo||''}</div></div><div class="rdist">${c.dist<1?Math.round(c.dist*1000)+'m':c.dist.toFixed(1)+'km'}</div></div>`).join('');
 }
-function collapseSearch(){document.getElementById('resultsList').innerHTML='';document.getElementById('searchInput').value='';document.getElementById('searchInput').blur();}
-function selectClient(id){const c=allClients.find(x=>x.id===id);if(!c)return;collapseSearch();isFollowing=false;map.flyTo([c.lat,c.lng],17,{duration:0.5});setTimeout(()=>showClientPopup(c),350);}
+function collapseSearch(){collapseSearchPanel();}
+function selectClient(id){const c=allClients.find(x=>x.id===id);if(!c)return;collapseSearchPanel();isFollowing=false;map.flyTo([c.lat,c.lng],17,{duration:0.5});setTimeout(()=>showClientPopup(c),350);}
 function showClientPopup(c){
   selectedClient=c;
   document.getElementById('popupName').textContent=c.nombre||'Cliente';
@@ -518,7 +623,7 @@ function startActiveNav(){
   navActive=true;
   document.getElementById('routeSheet').classList.remove('active');
   document.getElementById('navTop').classList.add('active');
-  document.getElementById('searchPanel').style.display='none';
+  collapseSearchPanel();
   document.getElementById('navPanel').classList.add('active');
   isFollowing=true;
   map.flyTo([userLat,userLng],18,{duration:0.8});
@@ -555,7 +660,7 @@ function reportAlert(){}
 // ═══ UTILS ═══
 function hav(la1,lo1,la2,lo2){const R=6371,dLa=(la2-la1)*Math.PI/180,dLo=(lo2-lo1)*Math.PI/180;const a=Math.sin(dLa/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLo/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
 
-setInterval(()=>{if(userLat&&!navActive)showNearbyClients();},15000);
+setInterval(()=>{if(userLat&&!navActive)renderNearby();},15000);
 setTimeout(()=>{if(!USER_ID)initFirebase();},1500);
 </script>
 </body>

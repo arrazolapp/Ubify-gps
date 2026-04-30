@@ -458,21 +458,7 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
   }
   setMapBearing(-curH);
   if(isFollowing&&userLat){
-    // Cursor al 75% de la altura de pantalla (25% desde abajo)
-    // para ver más recorrido por delante, estilo Waze
-    const mapH=map.getContainer().offsetHeight;
-    const targetY=mapH*0.75; // posición Y deseada del cursor en píxeles
-    const cursorPt=map.latLngToContainerPoint([lat,lng]);
-    const offsetY=targetY-cursorPt.y; // cuánto hay que desplazar el mapa
-    const newCenterPt=map.getContainer()?
-      map.latLngToContainerPoint(map.getCenter()):null;
-    if(newCenterPt){
-      const shiftedCenter=L.point(newCenterPt.x, newCenterPt.y-offsetY);
-      const shiftedLatLng=map.containerPointToLatLng(shiftedCenter);
-      map.panTo(shiftedLatLng,{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
-    } else {
-      map.panTo([lat,lng],{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
-    }
+    map.panTo(getOffsetCenter(lat,lng),{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
   }
   if(navActive&&navTarget)updateNavInfo();
 }
@@ -481,14 +467,7 @@ function recenter(){
   isFollowing=true;
   document.getElementById('speedometer').classList.remove('recenter-mode');
   if(!userLat)return;
-  const mapH=map.getContainer().offsetHeight;
-  const targetY=mapH*0.75;
-  const cursorPt=map.latLngToContainerPoint([userLat,userLng]);
-  const offsetY=targetY-cursorPt.y;
-  const centerPt=map.latLngToContainerPoint(map.getCenter());
-  const shiftedCenter=L.point(centerPt.x,centerPt.y-offsetY);
-  const shiftedLatLng=map.containerPointToLatLng(shiftedCenter);
-  map.flyTo(shiftedLatLng,17,{duration:0.5});
+  map.flyTo(getOffsetCenter(userLat,userLng),17,{duration:0.5});
 }
 function centerOnUser(){recenter();}
 function onSpeedometerClick(){if(!isFollowing)recenter();}
@@ -636,20 +615,23 @@ function updateFloatingButtons(){
   if(popup&&popup.classList.contains('visible')){
     popup.style.bottom=(barH+8)+'px';
   }
-  // Reencuadrar el mapa: el cursor queda centrado en el área visible libre
-  updateMapPadding(barH);
+  // Reencuadrar el mapa para que el cursor no quede detrás de la barra
+  if(isFollowing&&userLat&&map.getContainer()){
+    map.panTo(getOffsetCenter(userLat,userLng),{animate:true,duration:0.35,easeLinearity:0.5,noMoveStart:true});
+  }
 }
 
-function updateMapPadding(barH){
-  if(!map||!userLat)return;
+// Helper: calcula la LatLng objetivo para que el cursor quede al 75% del área visible
+function getOffsetCenter(lat,lng){
+  const bar=document.getElementById('bottomBar');
+  const barH=bar?bar.offsetHeight:0;
   const mapH=map.getContainer().offsetHeight;
-  const targetY=mapH*0.75;
-  const cursorPt=map.latLngToContainerPoint([userLat,userLng]);
+  const visibleH=mapH-barH; // área libre sobre la barra
+  const targetY=visibleH*0.75; // 75% del área visible
+  const cursorPt=map.latLngToContainerPoint([lat,lng]);
   const offsetY=targetY-cursorPt.y;
   const centerPt=map.latLngToContainerPoint(map.getCenter());
-  const shiftedCenter=L.point(centerPt.x,centerPt.y-offsetY);
-  const shiftedLatLng=map.containerPointToLatLng(shiftedCenter);
-  if(isFollowing)map.panTo(shiftedLatLng,{animate:true,duration:0.35,easeLinearity:0.5,noMoveStart:true});
+  return map.containerPointToLatLng(L.point(centerPt.x,centerPt.y-offsetY));
 }
 // Observer para detectar cambios de altura en la barra
 const _barObs=new ResizeObserver(()=>updateFloatingButtons());

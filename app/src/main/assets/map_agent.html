@@ -458,17 +458,18 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
   }
   setMapBearing(-curH);
   if(isFollowing&&userLat){
-    const bar=document.getElementById('bottomBar');
-    const barH=bar?bar.offsetHeight:0;
-    // CURSOR_OFFSET: fracción de barH que se desplaza el mapa hacia abajo.
-    // 0 = cursor en centro geométrico, 1 = cursor pegado al borde de la barra.
-    // ~0.72 coloca el cursor justo encima de los íconos flotantes (estilo Waze).
-    const CURSOR_OFFSET=0.72;
-    if(barH>0&&map.getContainer()){
-      const centerPt=map.latLngToContainerPoint([lat,lng]);
-      const targetPt=L.point(centerPt.x,centerPt.y+barH*CURSOR_OFFSET);
-      const targetLatLng=map.containerPointToLatLng(targetPt);
-      map.panTo(targetLatLng,{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
+    // Cursor al 75% de la altura de pantalla (25% desde abajo)
+    // para ver más recorrido por delante, estilo Waze
+    const mapH=map.getContainer().offsetHeight;
+    const targetY=mapH*0.75; // posición Y deseada del cursor en píxeles
+    const cursorPt=map.latLngToContainerPoint([lat,lng]);
+    const offsetY=targetY-cursorPt.y; // cuánto hay que desplazar el mapa
+    const newCenterPt=map.getContainer()?
+      map.latLngToContainerPoint(map.getCenter()):null;
+    if(newCenterPt){
+      const shiftedCenter=L.point(newCenterPt.x, newCenterPt.y-offsetY);
+      const shiftedLatLng=map.containerPointToLatLng(shiftedCenter);
+      map.panTo(shiftedLatLng,{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
     } else {
       map.panTo([lat,lng],{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
     }
@@ -480,17 +481,14 @@ function recenter(){
   isFollowing=true;
   document.getElementById('speedometer').classList.remove('recenter-mode');
   if(!userLat)return;
-  const bar=document.getElementById('bottomBar');
-  const barH=bar?bar.offsetHeight:0;
-  const CURSOR_OFFSET=0.72;
-  if(barH>0&&map.getContainer()){
-    const centerPt=map.latLngToContainerPoint([userLat,userLng]);
-    const targetPt=L.point(centerPt.x,centerPt.y+barH*CURSOR_OFFSET);
-    const targetLatLng=map.containerPointToLatLng(targetPt);
-    map.flyTo(targetLatLng,17,{duration:0.5});
-  } else {
-    map.flyTo([userLat,userLng],17,{duration:0.5});
-  }
+  const mapH=map.getContainer().offsetHeight;
+  const targetY=mapH*0.75;
+  const cursorPt=map.latLngToContainerPoint([userLat,userLng]);
+  const offsetY=targetY-cursorPt.y;
+  const centerPt=map.latLngToContainerPoint(map.getCenter());
+  const shiftedCenter=L.point(centerPt.x,centerPt.y-offsetY);
+  const shiftedLatLng=map.containerPointToLatLng(shiftedCenter);
+  map.flyTo(shiftedLatLng,17,{duration:0.5});
 }
 function centerOnUser(){recenter();}
 function onSpeedometerClick(){if(!isFollowing)recenter();}
@@ -643,15 +641,15 @@ function updateFloatingButtons(){
 }
 
 function updateMapPadding(barH){
-  if(!map)return;
-  const CURSOR_OFFSET=0.72;
-  map._mapPaddingBottom=barH||0;
-  if(isFollowing&&userLat){
-    const centerPt=map.latLngToContainerPoint([userLat,userLng]);
-    const targetPt=L.point(centerPt.x,centerPt.y+(barH||0)*CURSOR_OFFSET);
-    const targetLatLng=map.containerPointToLatLng(targetPt);
-    map.panTo(targetLatLng,{animate:true,duration:0.35,easeLinearity:0.5,noMoveStart:true});
-  }
+  if(!map||!userLat)return;
+  const mapH=map.getContainer().offsetHeight;
+  const targetY=mapH*0.75;
+  const cursorPt=map.latLngToContainerPoint([userLat,userLng]);
+  const offsetY=targetY-cursorPt.y;
+  const centerPt=map.latLngToContainerPoint(map.getCenter());
+  const shiftedCenter=L.point(centerPt.x,centerPt.y-offsetY);
+  const shiftedLatLng=map.containerPointToLatLng(shiftedCenter);
+  if(isFollowing)map.panTo(shiftedLatLng,{animate:true,duration:0.35,easeLinearity:0.5,noMoveStart:true});
 }
 // Observer para detectar cambios de altura en la barra
 const _barObs=new ResizeObserver(()=>updateFloatingButtons());

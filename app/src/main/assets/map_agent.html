@@ -702,7 +702,7 @@ function startRoutePreview(){
   map.flyToBounds(L.latLngBounds([[userLat,userLng],[navTarget.lat,navTarget.lng]]),{padding:[80,120],duration:0.8});
   fetchRoute();
 }
-function cancelRoute(){document.getElementById('routeSheet').classList.remove('active');if(routeLine){map.removeLayer(routeLine);routeLine=null;}navTarget=null;document.getElementById('searchPanel').style.display='';}
+function cancelRoute(){document.getElementById('routeSheet').classList.remove('active');if(routeLine){map.removeLayer(routeLine);routeLine=null;}if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}navTarget=null;document.getElementById('searchPanel').style.display='';}
 
 async function fetchRoute(){
   if(window.Android?.fetchRoute){window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);return;}
@@ -724,14 +724,18 @@ function onRouteResult(data){
   const route=data.routes[0];
   const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
   if(routeLine)map.removeLayer(routeLine);
-  routeLine=L.polyline(coords,{color:'#4a90d9',weight:7,opacity:0.9,lineJoin:'round',lineCap:'round'}).addTo(map);
+  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
+  // Línea de fondo morado claro (efecto borde exterior estilo Waze)
+  window._routeLineBg=L.polyline(coords,{color:'#C9A0F0',weight:12,opacity:0.45,lineJoin:'round',lineCap:'round'}).addTo(map);
+  // Línea principal morada
+  routeLine=L.polyline(coords,{color:'#7B2FBE',weight:7,opacity:0.95,lineJoin:'round',lineCap:'round'}).addTo(map);
   const km=route.distance/1000,min=Math.round(route.duration/60);
   document.getElementById('routeEta').textContent=`${min} min`;
   document.getElementById('routeDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
   const roads=(route.legs?.[0]?.steps||[]).filter(s=>s.name&&s.name.length>3&&s.distance>300).map(s=>s.name);
   document.getElementById('routeName').textContent=[...new Set(roads)].slice(0,2).join(' · ')||`Hacia ${navTarget.nombre||'cliente'}`;
   document.getElementById('routeInfo').textContent='Mejor ruta · Tráfico habitual';
-  map.flyToBounds(L.latLngBounds(coords),{padding:[60,100],duration:0.8});
+  map.flyToBounds(L.latLngBounds(coords),{padding:[40,60],maxZoom:17,duration:0.8});
 }
 function onRouteResultFromAndroid(){try{if(window._routeJson)onRouteResult(window._routeJson);}catch(e){}}
 
@@ -742,7 +746,7 @@ function startActiveNav(){
   collapseSearchPanel();
   document.getElementById('navPanel').classList.add('active');
   isFollowing=true;
-  map.flyTo([userLat,userLng],18,{duration:0.8});
+  map.flyTo([userLat,userLng],19,{duration:0.8});
   updateNavInfo();
 }
 function updateNavInfo(){
@@ -761,6 +765,7 @@ function updateNavInfo(){
 function stopNavigation(){
   navActive=false;navTarget=null;
   if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
   document.getElementById('navTop').classList.remove('active');
   document.getElementById('navPanel').classList.remove('active');
   document.getElementById('routeSheet').classList.remove('active');

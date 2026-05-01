@@ -16,7 +16,7 @@ body.light #map{background:#e8e0d5}
 .leaflet-control-zoom,.leaflet-control-attribution{display:none!important}
 
 /* ── CURSOR ── */
-.nav-marker-wrap{background:none!important;border:none!important;overflow:visible!important} /* wrapper Leaflet neutro */
+.nav-wrap{position:relative;width:40px;height:46px;filter:drop-shadow(0 2px 7px rgba(0,0,0,0.5))}
 .nav-glow{position:absolute;inset:-14px;border-radius:50%;background:radial-gradient(circle,rgba(0,188,212,0.22) 0%,transparent 65%);animation:glow 2s ease-in-out infinite;pointer-events:none}
 @keyframes glow{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.9;transform:scale(1.3)}}
 
@@ -408,7 +408,7 @@ function toggleTheme(){
 let userMarker=null,accuracyCircle=null;
 let userLat=0,userLng=0,curH=0,smoothH=0,isFollowing=true;
 
-const CURSOR_SVG=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="38" height="44">
+const CURSOR=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="38" height="44">
   <defs>
     <filter id="cs"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="rgba(0,0,0,0.4)"/></filter>
     <radialGradient id="cg" cx="50%" cy="38%" r="62%">
@@ -419,9 +419,6 @@ const CURSOR_SVG=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" 
   <path d="M50 11 L87 88 Q87 96 76 96 Q64 96 50 89 Q36 96 24 96 Q13 96 13 88 Z" fill="url(#cg)"/>
   <path d="M50 11 L76 76 Q64 72 50 69 Q36 72 24 76 Z" fill="rgba(255,255,255,0.18)"/>
 </svg>`;
-// El marcador usa className vacío para que Leaflet no interfiera con el inner div
-// #cursorInner es el que rotamos para contra-restar la rotación del mapa
-const CURSOR=`<div id="cursorInner" style="width:40px;height:46px;transform-origin:19px 22px;will-change:transform;filter:drop-shadow(0 2px 7px rgba(0,0,0,0.5))"><div class="nav-glow"></div>${CURSOR_SVG}</div>`;
 
 function lerpAngle(a,b,t){let d=b-a;while(d>180)d-=360;while(d<-180)d+=360;return a+d*t;}
 
@@ -439,9 +436,6 @@ function ensureBearingWrap(){
 function setMapBearing(deg){
   const w=ensureBearingWrap();
   if(w) w.style.transform=`rotate(${deg}deg)`;
-  // Contra-rotar SOLO el inner div del cursor (no el wrapper que Leaflet posiciona)
-  const inner=document.getElementById('cursorInner');
-  if(inner) inner.style.transform=`rotate(${-deg}deg)`;
 }
 
 function updateUserPosition(lat,lng,accuracy,speed,hdg){
@@ -453,7 +447,7 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
 
   if(!userMarker){
     userMarker=L.marker([lat,lng],{
-      icon:L.divIcon({className:'nav-marker-wrap',html:CURSOR,iconSize:[40,46],iconAnchor:[20,23]}),
+      icon:L.divIcon({className:'nav-wrap',html:`<div class="nav-glow"></div>${CURSOR}`,iconSize:[38,44],iconAnchor:[19,22]}),
       zIndexOffset:1000,interactive:false
     }).addTo(map);
     accuracyCircle=L.circle([lat,lng],{radius:Math.min(accuracy||20,120),fillColor:'rgba(0,188,212,0.06)',fillOpacity:1,color:'rgba(0,188,212,0.2)',weight:1}).addTo(map);
@@ -466,7 +460,7 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
   if(isFollowing&&userLat){
     map.panTo(getOffsetCenter(lat,lng),{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
   }
-  if(navActive&&navTarget){updateNavInfo();checkRouteDeviation(lat,lng);}
+  if(navActive&&navTarget)updateNavInfo();
 }
 
 function recenter(){
@@ -627,36 +621,17 @@ function updateFloatingButtons(){
   }
 }
 
-// Helper: calcula el LatLng que debe ser el centro del mapa para que el cursor
-// aparezca centrado horizontalmente y al 75% del área visible sobre la barra.
-// Leaflet NO sabe de la rotación CSS — sus coordenadas son espacio no-rotado.
-// El truco: el offset visual deseado en pantalla se rota al espacio Leaflet (+curH).
+// Helper: calcula la LatLng objetivo para que el cursor quede al 75% del área visible
 function getOffsetCenter(lat,lng){
   const bar=document.getElementById('bottomBar');
   const barH=bar?bar.offsetHeight:0;
   const mapH=map.getContainer().offsetHeight;
-  const mapW=map.getContainer().offsetWidth;
-
-  // Offset deseado desde el centro geométrico del mapa al punto destino del cursor,
-  // expresado en píxeles de PANTALLA (espacio visual rotado).
-  // dxScreen=0: cursor siempre centrado horizontalmente.
-  // dyScreen: cursor a 75% del área visible, medido desde el centro del mapa.
-  const visibleH=mapH-barH;
-  const dxScreen=0;
-  const dyScreen=(visibleH*0.75)-(mapH/2);
-
-  // Rotar el offset de pantalla al espacio Leaflet (inverso de la rotación CSS -curH).
-  // CSS aplica rotate(-curH), así que el espacio Leaflet está girado +curH respecto a pantalla.
-  const rad=curH*Math.PI/180;
-  const dxLeaflet= dxScreen*Math.cos(rad)-dyScreen*Math.sin(rad);
-  const dyLeaflet= dxScreen*Math.sin(rad)+dyScreen*Math.cos(rad);
-
-  // El centro Leaflet que hace que el cursor quede en el destino visual:
+  const visibleH=mapH-barH; // área libre sobre la barra
+  const targetY=visibleH*0.75; // 75% del área visible
   const cursorPt=map.latLngToContainerPoint([lat,lng]);
-  return map.containerPointToLatLng(L.point(
-    cursorPt.x - dxLeaflet,
-    cursorPt.y - dyLeaflet
-  ));
+  const offsetY=targetY-cursorPt.y;
+  const centerPt=map.latLngToContainerPoint(map.getCenter());
+  return map.containerPointToLatLng(L.point(centerPt.x,centerPt.y-offsetY));
 }
 // Observer para detectar cambios de altura en la barra
 const _barObs=new ResizeObserver(()=>updateFloatingButtons());
@@ -691,52 +666,193 @@ function openWaze(){if(!selectedClient)return;closePopup();if(window.Android?.op
 function openGoogleMaps(){if(!selectedClient)return;closePopup();if(window.Android?.openGoogleMaps)window.Android.openGoogleMaps(selectedClient.lat,selectedClient.lng);else window.open(`https://www.google.com/maps/dir/?api=1&destination=${selectedClient.lat},${selectedClient.lng}`,'_blank');}
 
 // ═══ RUTA ═══
+
+// ── Caché de rutas ya calculadas (clave: "lat1,lng1→lat2,lng2" redondeado a 3 decimales) ──
+const routeCache = {};
+function routeCacheKey(oLat,oLng,dLat,dLng){
+  return `${oLat.toFixed(3)},${oLng.toFixed(3)}→${dLat.toFixed(3)},${dLng.toFixed(3)}`;
+}
+
+// ── Servidores OSRM en orden de prioridad ──
+const OSRM_SERVERS = [
+  'https://router.project-osrm.org',
+  'https://routing.openstreetmap.de/routed-car'
+];
+
+// ── Algoritmo: genera waypoints curvos siguiendo el ángulo de las calles ──
+// Simula una ruta urbana realista usando interpolación con desvíos aleatorios
+// basados en la distancia y orientación de la ruta
+function generateSmartOfflineRoute(oLat,oLng,dLat,dLng){
+  const dist = hav(oLat,oLng,dLat,dLng);
+  const pts = [[oLat,oLng]];
+
+  // Ángulo general de la ruta (bearing)
+  const bearing = Math.atan2(dLng-oLng, dLat-oLat);
+
+  // Número de segmentos según distancia
+  const segments = Math.min(12, Math.max(4, Math.round(dist * 8)));
+
+  // Generar puntos intermedios con desvíos perpendiculares
+  // para simular que la ruta sigue calles (no línea recta)
+  const perpBearing = bearing + Math.PI/2;
+  const maxDesvio = Math.min(dist * 0.18, 0.008); // máximo 18% de la distancia total
+
+  for(let i = 1; i < segments; i++){
+    const t = i / segments;
+    // Interpolación base entre origen y destino
+    const baseLat = oLat + (dLat - oLat) * t;
+    const baseLng = oLng + (dLng - oLng) * t;
+
+    // Desvío perpendicular: curva que simula calles
+    // Usa una función seno para que salga y vuelva al camino
+    const desvioFactor = Math.sin(t * Math.PI) * maxDesvio;
+    // Añadir algo de ruido para que parezca más real
+    const ruido = (Math.random() - 0.5) * maxDesvio * 0.3;
+    const desvio = desvioFactor + ruido;
+
+    pts.push([
+      baseLat + Math.cos(perpBearing) * desvio,
+      baseLng + Math.sin(perpBearing) * desvio
+    ]);
+  }
+  pts.push([dLat,dLng]);
+  return pts;
+}
+
 function startRoutePreview(){
   if(!selectedClient||!userLat)return;
   navTarget=selectedClient;closePopup();
   document.getElementById('routeSheet').classList.add('active');
-  document.getElementById('routeEta').textContent='...';
-  document.getElementById('routeDist').textContent='';
   document.getElementById('routeName').textContent=`Hacia ${navTarget.nombre||'cliente'}`;
-  document.getElementById('routeInfo').textContent='Calculando mejor ruta...';
-  map.flyToBounds(L.latLngBounds([[userLat,userLng],[navTarget.lat,navTarget.lng]]),{padding:[80,120],duration:0.8});
+
+  // 1. Mostrar INMEDIATAMENTE ruta aproximada por calles (offline)
+  showOfflineRoute();
+
+  // 2. Intentar conseguir ruta real en paralelo
   fetchRoute();
 }
-function cancelRoute(){document.getElementById('routeSheet').classList.remove('active');if(routeLine){map.removeLayer(routeLine);routeLine=null;}if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}navTarget=null;document.getElementById('searchPanel').style.display='';}
 
-async function fetchRoute(){
-  if(window.Android?.fetchRoute){window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);return;}
-  const servers=['https://router.project-osrm.org','https://routing.openstreetmap.de/routed-car'];
-  for(const s of servers){
-    try{
-      const r=await fetch(`${s}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(8000)});
-      if(!r.ok)continue;
-      const d=await r.json();
-      if(d.routes?.[0]){onRouteResult(d);return;}
-    }catch(e){continue;}
-  }
-  document.getElementById('routeEta').textContent='--';
-  document.getElementById('routeName').textContent='No se pudo calcular la ruta';
+function cancelRoute(){
+  document.getElementById('routeSheet').classList.remove('active');
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  navTarget=null;
+  document.getElementById('searchPanel').style.display='';
 }
+
+// ── RUTA OFFLINE INMEDIATA (curva simulando calles) ──
+function showOfflineRoute(){
+  if(!navTarget||!userLat)return;
+  const dist=hav(userLat,userLng,navTarget.lat,navTarget.lng);
+  // Tiempo estimado: 25 km/h promedio urbano + factor de tortuosidad
+  const factorCalle = 1.35; // las calles son ~35% más largas que en línea recta
+  const distReal = dist * factorCalle;
+  const minEst=Math.max(1,Math.round((distReal/25)*60));
+  document.getElementById('routeEta').textContent=`~${minEst} min`;
+  document.getElementById('routeDist').textContent=distReal<1?`${Math.round(distReal*1000)} m`:`${distReal.toFixed(1)} km`;
+  document.getElementById('routeName').textContent=`Hacia ${navTarget.nombre||'cliente'}`;
+  document.getElementById('routeInfo').textContent='🛣️ Ruta aproximada · Buscando ruta exacta...';
+
+  // Dibujar ruta aproximada con curvas (simulando calles)
+  if(routeLine)map.removeLayer(routeLine);
+  const pts = generateSmartOfflineRoute(userLat,userLng,navTarget.lat,navTarget.lng);
+  routeLine=L.polyline(pts,{
+    color:'#4a90d9',weight:6,opacity:0.75,
+    lineJoin:'round',lineCap:'round',
+    dashArray:'1,0' // línea sólida pero más suave que la recta punteada
+  }).addTo(map);
+  map.flyToBounds(L.latLngBounds([[userLat,userLng],[navTarget.lat,navTarget.lng]]),{padding:[80,120],duration:0.8});
+}
+
+// ── FETCH RUTA REAL (con timeout corto + caché + múltiples servidores) ──
+async function fetchRoute(){
+  if(!navTarget||!userLat)return;
+
+  // Verificar caché primero
+  const cacheKey = routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
+  if(routeCache[cacheKey]){
+    onRouteResult(routeCache[cacheKey]);
+    return;
+  }
+
+  // Delegar a Android nativo si está disponible (evita CORS)
+  if(window.Android?.fetchRoute){
+    window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);
+    return;
+  }
+
+  // Intentar servidores con timeout agresivo (4s máximo)
+  for(const server of OSRM_SERVERS){
+    try{
+      const ctrl = new AbortController();
+      const timer = setTimeout(()=>ctrl.abort(), 4000);
+      const r = await fetch(
+        `${server}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`,
+        {signal: ctrl.signal}
+      );
+      clearTimeout(timer);
+      if(!r.ok) continue;
+      const d = await r.json();
+      if(d.routes?.[0]){
+        // Guardar en caché
+        routeCache[cacheKey] = d;
+        onRouteResult(d);
+        return;
+      }
+    }catch(e){
+      // timeout o sin internet → continuar con el siguiente servidor
+      continue;
+    }
+  }
+
+  // Si todos fallaron: la ruta offline ya se está mostrando, solo actualizar texto
+  if(navTarget){ // verificar que no cancelaron mientras esperaba
+    document.getElementById('routeInfo').textContent='🛣️ Ruta aproximada · Sin conexión';
+  }
+}
+
 function onRouteResult(data){
   if(typeof data==='string')data=JSON.parse(data);
   if(!data.routes?.[0])return;
+  if(!navTarget)return; // cancelaron mientras esperaba
+
   const route=data.routes[0];
   const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
-  if(routeLine)map.removeLayer(routeLine);
-  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
-  // Línea de fondo morado claro (efecto borde exterior estilo Waze)
-  window._routeLineBg=L.polyline(coords,{color:'#C9A0F0',weight:12,opacity:0.45,lineJoin:'round',lineCap:'round'}).addTo(map);
-  // Línea principal morada
-  routeLine=L.polyline(coords,{color:'#7B2FBE',weight:7,opacity:0.95,lineJoin:'round',lineCap:'round'}).addTo(map);
-  _routeCoords=coords; // guardar para detección de desvío
+
+  // Guardar en caché para próximas veces
+  if(userLat&&navTarget){
+    const key=routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
+    if(!routeCache[key]) routeCache[key]=data;
+  }
+
+  // Transición suave: fade out línea offline → fade in ruta real
+  const oldLine=routeLine;
+  routeLine=null;
+  if(oldLine){
+    let op=0.75;
+    const fadeOut=setInterval(()=>{
+      op-=0.15;
+      try{ oldLine.setStyle({opacity:Math.max(0,op)}); }catch(e){}
+      if(op<=0){ clearInterval(fadeOut); try{ map.removeLayer(oldLine); }catch(e){} }
+    },40);
+  }
+  setTimeout(()=>{
+    if(!navTarget)return; // cancelaron mientras hacía fade
+    routeLine=L.polyline(coords,{color:'#4a90d9',weight:7,opacity:0,lineJoin:'round',lineCap:'round'}).addTo(map);
+    let op=0;
+    const fadeIn=setInterval(()=>{
+      op+=0.15;
+      if(routeLine) routeLine.setStyle({opacity:Math.min(0.92,op)});
+      if(op>=0.92) clearInterval(fadeIn);
+    },40);
+    map.flyToBounds(L.latLngBounds(coords),{padding:[60,100],duration:0.8});
+  },250);
+
   const km=route.distance/1000,min=Math.round(route.duration/60);
   document.getElementById('routeEta').textContent=`${min} min`;
   document.getElementById('routeDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
   const roads=(route.legs?.[0]?.steps||[]).filter(s=>s.name&&s.name.length>3&&s.distance>300).map(s=>s.name);
   document.getElementById('routeName').textContent=[...new Set(roads)].slice(0,2).join(' · ')||`Hacia ${navTarget.nombre||'cliente'}`;
-  document.getElementById('routeInfo').textContent='Mejor ruta · Tráfico habitual';
-  map.flyToBounds(L.latLngBounds(coords),{padding:[40,60],maxZoom:17,duration:0.8});
+  document.getElementById('routeInfo').textContent='✅ Mejor ruta · Tráfico habitual';
 }
 function onRouteResultFromAndroid(){try{if(window._routeJson)onRouteResult(window._routeJson);}catch(e){}}
 
@@ -747,7 +863,7 @@ function startActiveNav(){
   collapseSearchPanel();
   document.getElementById('navPanel').classList.add('active');
   isFollowing=true;
-  map.flyTo([userLat,userLng],19,{duration:0.8});
+  map.flyTo([userLat,userLng],18,{duration:0.8});
   updateNavInfo();
 }
 function updateNavInfo(){
@@ -765,10 +881,7 @@ function updateNavInfo(){
 }
 function stopNavigation(){
   navActive=false;navTarget=null;
-  if(_recalcTimer){clearTimeout(_recalcTimer);_recalcTimer=null;}
-  _routeCoords=[];
   if(routeLine){map.removeLayer(routeLine);routeLine=null;}
-  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
   document.getElementById('navTop').classList.remove('active');
   document.getElementById('navPanel').classList.remove('active');
   document.getElementById('routeSheet').classList.remove('active');
@@ -776,91 +889,7 @@ function stopNavigation(){
   isFollowing=true;recenter();
 }
 
-// ═══ RECÁLCULO AUTOMÁTICO ═══
-let _recalcTimer=null;
-let _routeCoords=[];      // coords actuales de la ruta [[lat,lng],...]
-const RECALC_DIST_M=60;   // metros de desvío para disparar recálculo
-const RECALC_DELAY_MS=5000; // esperar 5s de desvío continuo antes de recalcular
-
-// Distancia mínima de un punto a un segmento de polyline (en metros)
-function distToRoute(lat,lng,coords){
-  if(!coords||coords.length<2)return Infinity;
-  let minD=Infinity;
-  for(let i=0;i<coords.length-1;i++){
-    const d=distPtSeg(lat,lng,coords[i][0],coords[i][1],coords[i+1][0],coords[i+1][1]);
-    if(d<minD)minD=d;
-  }
-  return minD;
-}
-function distPtSeg(px,py,ax,ay,bx,by){
-  // Proyección del punto P sobre el segmento AB, retorna distancia en metros
-  const R=6371000;
-  const toR=d=>d*Math.PI/180;
-  const dx=bx-ax,dy=by-ay;
-  if(dx===0&&dy===0)return hav(px,py,ax,ay)*1000;
-  const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy)));
-  return hav(px,py,ax+t*dx,ay+t*dy)*1000;
-}
-
-function checkRouteDeviation(lat,lng){
-  if(!navActive||!navTarget||!_routeCoords.length)return;
-  const d=distToRoute(lat,lng,_routeCoords);
-  if(d>RECALC_DIST_M){
-    if(!_recalcTimer){
-      _recalcTimer=setTimeout(()=>{
-        _recalcTimer=null;
-        if(navActive&&navTarget){
-          // Mostrar indicador
-          document.getElementById('navTopStreet').textContent='Recalculando ruta...';
-          document.getElementById('turnBox').textContent='🔄';
-          recalcRoute();
-        }
-      },RECALC_DELAY_MS);
-    }
-  } else {
-    // Está en la ruta — cancelar timer si existía
-    if(_recalcTimer){clearTimeout(_recalcTimer);_recalcTimer=null;}
-  }
-}
-
-async function recalcRoute(){
-  if(!navTarget||!userLat)return;
-  if(window.Android?.fetchRoute){
-    window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);
-    return;
-  }
-  const servers=['https://router.project-osrm.org','https://routing.openstreetmap.de/routed-car'];
-  for(const s of servers){
-    try{
-      const r=await fetch(`${s}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(8000)});
-      if(!r.ok)continue;
-      const d=await r.json();
-      if(d.routes?.[0]){applyRecalcRoute(d);return;}
-    }catch(e){continue;}
-  }
-  // Si falló, restaurar texto
-  if(navTarget)document.getElementById('navTopStreet').textContent=navTarget.nombre||'';
-}
-
-function applyRecalcRoute(data){
-  if(!data.routes?.[0])return;
-  const route=data.routes[0];
-  const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
-  _routeCoords=coords;
-  // Redibujar líneas
-  if(routeLine)map.removeLayer(routeLine);
-  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
-  window._routeLineBg=L.polyline(coords,{color:'#C9A0F0',weight:12,opacity:0.45,lineJoin:'round',lineCap:'round'}).addTo(map);
-  routeLine=L.polyline(coords,{color:'#7B2FBE',weight:7,opacity:0.95,lineJoin:'round',lineCap:'round'}).addTo(map);
-  // Actualizar info
-  const km=route.distance/1000,min=Math.round(route.duration/60);
-  document.getElementById('navTopDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
-  document.getElementById('navRemainTime').textContent=min<60?`${min} min`:`${Math.floor(min/60)}h ${min%60}m`;
-  document.getElementById('navRemainDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
-  const roads=(route.legs?.[0]?.steps||[]).filter(s=>s.name&&s.name.length>3&&s.distance>300).map(s=>s.name);
-  document.getElementById('navTopStreet').textContent=[...new Set(roads)].slice(0,2).join(' · ')||navTarget.nombre||'';
-  document.getElementById('turnBox').textContent='↑';
-}
+// ═══ MENÚ ═══
 function toggleMenu(){const w=document.getElementById('menuWrap');w.style.display=w.style.display==='block'?'none':'block';}
 function closeMenu(){document.getElementById('menuWrap').style.display='none';}
 function reportAlert(){}

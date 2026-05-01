@@ -16,7 +16,8 @@ body.light #map{background:#e8e0d5}
 .leaflet-control-zoom,.leaflet-control-attribution{display:none!important}
 
 /* ── CURSOR ── */
-.nav-marker-wrap{background:none!important;border:none!important;overflow:visible!important} /* wrapper Leaflet neutro */
+.nav-wrap{position:relative;width:40px;height:46px;filter:drop-shadow(0 2px 7px rgba(0,0,0,0.5))}
+.nav-wrap svg{transition:transform 0.3s ease;transform-origin:50% 50%}
 .nav-glow{position:absolute;inset:-14px;border-radius:50%;background:radial-gradient(circle,rgba(0,188,212,0.22) 0%,transparent 65%);animation:glow 2s ease-in-out infinite;pointer-events:none}
 @keyframes glow{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.9;transform:scale(1.3)}}
 
@@ -155,49 +156,32 @@ body.light #map{background:#e8e0d5}
 .light .nearby-header{color:rgba(0,0,0,0.35)}
 
 /* ── LIGHT MODE ── */
-body.light{background:#c8e6f5}
+body.light{background:#e8e0d5}
 .light .speedometer{background:transparent;box-shadow:none}
 .light .speed-val{color:white}
 .light .speed-unit{color:rgba(255,255,255,0.5)}
-.light .fab{background:rgba(255,255,255,0.92);box-shadow:0 2px 10px rgba(0,0,0,0.18)}
+.light .fab{background:rgba(255,255,255,0.95);box-shadow:0 2px 10px rgba(0,0,0,0.15)}
 .light .fab svg{stroke:#222}
 .light #fabTheme svg{fill:#222}
-/* Hamburguesa */
-.light .fab-menu{background:rgba(255,255,255,0.92);box-shadow:0 2px 10px rgba(0,0,0,0.18)}
-.light .fab-menu span{background:#222}
-/* Botón de alerta */
-.light .fab-alert{background:rgba(255,255,255,0.92);border-color:rgba(0,0,0,0.08);box-shadow:0 4px 16px rgba(0,0,0,0.15)}
-/* Barra superior nav */
-.light .nav-top{background:#d1ebf7;border-bottom:1px solid rgba(0,0,0,0.08)}
-.light .nav-top-dist{color:#1a3a4a}
-.light .nav-top-street{color:rgba(26,58,74,0.7)}
-.light .nav-top-close{background:rgba(0,0,0,0.08);color:#333}
-/* Panel navegación inferior */
-.light .nav-panel{background:#d1ebf7;border-top:1px solid rgba(0,0,0,0.07)}
-.light .nav-arrival{color:#1a3a4a}
-.light .nav-details{color:rgba(26,58,74,0.65)}
-.light .nav-cancel{background:rgba(0,0,0,0.10);color:#333}
-.light .nav-recenter{background:rgba(0,0,0,0.08);color:#333}
-.light .sh-inner{background:rgba(0,0,0,0.15)}
-/* Panel búsqueda */
-.light .search-panel{background:#d1ebf7;border-top:1px solid rgba(0,0,0,0.07)}
+.light .search-panel,.light .nav-panel{background:rgba(255,255,255,0.97)}
 .light .sh,.light .nav-row .sh{background:rgba(0,0,0,0.1)}
-.light .search-row{background:rgba(255,255,255,0.7);border-color:rgba(0,0,0,0.08)}
-.light .search-input{color:#1a3a4a}
-.light .search-input::placeholder{color:rgba(26,58,74,0.45)}
-.light .si,.light .sm{color:rgba(26,58,74,0.5)}
-.light .qt{background:rgba(255,255,255,0.6);border-color:rgba(0,0,0,0.07)}
-.light .qt-lb{color:#1a3a4a}
-.light .rname{color:#1a3a4a}
-.light .rsub{color:#5a8a9a}
-.light .result-row{border-color:rgba(0,0,0,0.06)}
-/* Popups y sheets */
-.light .client-popup,.light .route-inner{background:#d1ebf7;border-color:rgba(0,0,0,0.08)}
-.light .popup-name,.light .route-eta{color:#1a3a4a}
-.light .popup-addr,.light .route-name,.light .route-dist{color:#5a8a9a}
-.light .pb-close{background:rgba(0,0,0,0.08);color:#444}
-.light .rb-cancel{background:rgba(0,0,0,0.08);color:#444}
-.light .nearby-header{color:rgba(26,58,74,0.45)}
+.light .search-row{background:rgba(0,0,0,0.04);border-color:rgba(0,0,0,0.06)}
+.light .search-input{color:#222}
+.light .search-input::placeholder{color:rgba(0,0,0,0.35)}
+.light .si,.light .sm{color:rgba(0,0,0,0.38)}
+.light .qt{background:rgba(0,0,0,0.04);border-color:rgba(0,0,0,0.05)}
+.light .qt-lb{color:#555}
+.light .rname{color:#222}
+.light .rsub{color:#888}
+.light .result-row{border-color:rgba(0,0,0,0.05)}
+.light .client-popup,.light .route-inner{background:rgba(255,255,255,0.99);border-color:rgba(0,0,0,0.07)}
+.light .popup-name,.light .route-eta{color:#222}
+.light .popup-addr,.light .route-name,.light .route-dist{color:#888}
+.light .pb-close,.light .rb-cancel{background:rgba(0,0,0,0.06);color:#666}
+.light .nav-arrival{color:#222}
+.light .nav-details{color:#888}
+.light .nav-top{background:#f0f0f0}
+.light .nav-top-dist,.light .nav-top-street{color:#222}
 </style>
 </head>
 <body>
@@ -425,7 +409,7 @@ function toggleTheme(){
 let userMarker=null,accuracyCircle=null;
 let userLat=0,userLng=0,curH=0,smoothH=0,isFollowing=true;
 
-const CURSOR_SVG=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="38" height="44">
+const CURSOR=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="38" height="44">
   <defs>
     <filter id="cs"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="rgba(0,0,0,0.4)"/></filter>
     <radialGradient id="cg" cx="50%" cy="38%" r="62%">
@@ -436,9 +420,6 @@ const CURSOR_SVG=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" 
   <path d="M50 11 L87 88 Q87 96 76 96 Q64 96 50 89 Q36 96 24 96 Q13 96 13 88 Z" fill="url(#cg)"/>
   <path d="M50 11 L76 76 Q64 72 50 69 Q36 72 24 76 Z" fill="rgba(255,255,255,0.18)"/>
 </svg>`;
-// El marcador usa className vacío para que Leaflet no interfiera con el inner div
-// #cursorInner es el que rotamos para contra-restar la rotación del mapa
-const CURSOR=`<div id="cursorInner" style="width:40px;height:46px;transform-origin:19px 22px;will-change:transform;filter:drop-shadow(0 2px 7px rgba(0,0,0,0.5))"><div class="nav-glow"></div>${CURSOR_SVG}</div>`;
 
 function lerpAngle(a,b,t){let d=b-a;while(d>180)d-=360;while(d<-180)d+=360;return a+d*t;}
 
@@ -448,7 +429,7 @@ function ensureBearingWrap(){
   const pane=document.querySelector('#map .leaflet-map-pane');
   if(!pane)return null;
   _bWrap=document.createElement('div');
-  _bWrap.style.cssText='position:absolute;inset:0;transform-origin:50% 50%;will-change:transform;';
+  _bWrap.style.cssText='position:absolute;inset:0;transform-origin:50% 50%;will-change:transform;transition:transform 0.35s ease;';
   pane.parentNode.insertBefore(_bWrap,pane);
   _bWrap.appendChild(pane);
   return _bWrap;
@@ -456,73 +437,7 @@ function ensureBearingWrap(){
 function setMapBearing(deg){
   const w=ensureBearingWrap();
   if(w) w.style.transform=`rotate(${deg}deg)`;
-  // Contra-rotar SOLO el inner div del cursor (no el wrapper que Leaflet posiciona)
-  const inner=document.getElementById('cursorInner');
-  if(inner) inner.style.transform=`rotate(${-deg}deg)`;
 }
-
-function setMapBearing(deg){
-  const w=ensureBearingWrap();
-  if(w) w.style.transform=`rotate(${deg}deg)`;
-  const inner=document.getElementById('cursorInner');
-  if(inner) inner.style.transform=`rotate(${-deg}deg)`;
-}
-
-// ═══ DRAG CORREGIDO PARA MAPA ROTADO ═══
-document.addEventListener('DOMContentLoaded',()=>{
-  const container=document.getElementById('map');
-
-  function unrotate(dx,dy){
-    const r=curH*Math.PI/180;
-    const cos=Math.cos(r),sin=Math.sin(r);
-    return{ x:dx*cos+dy*sin, y:-dx*sin+dy*cos };
-  }
-
-  let touch0=null;
-  let customDragging=false;
-
-  container.addEventListener('touchstart',e=>{
-    if(e.touches.length!==1){touch0=null;customDragging=false;return;}
-    touch0={x:e.touches[0].clientX,y:e.touches[0].clientY};
-    // Solo tomar control si hay rotación real
-    customDragging=Math.abs(curH)>=1;
-    if(customDragging){
-      // Suspender drag de Leaflet para este gesto
-      map.dragging.disable();
-    }
-  },{passive:true});
-
-  container.addEventListener('touchmove',e=>{
-    if(!touch0||e.touches.length!==1)return;
-    const t=e.touches[0];
-    const rawDx=t.clientX-touch0.x;
-    const rawDy=t.clientY-touch0.y;
-    touch0={x:t.clientX,y:t.clientY};
-
-    if(!customDragging)return; // Leaflet maneja solo si no hay rotación
-
-    const d=unrotate(rawDx,rawDy);
-    map.panBy([-d.x,-d.y],{animate:false,noMoveStart:true});
-
-    isFollowing=false;
-    document.getElementById('speedometer').classList.add('recenter-mode');
-  },{passive:true});
-
-  function onTouchEnd(){
-    touch0=null;
-    if(customDragging){
-      customDragging=false;
-      // Reactivar drag de Leaflet después del gesto
-      map.dragging.enable();
-    }
-  }
-  container.addEventListener('touchend',onTouchEnd,{passive:true});
-  container.addEventListener('touchcancel',onTouchEnd,{passive:true});
-});
-
-
-
-
 
 function updateUserPosition(lat,lng,accuracy,speed,hdg){
   userLat=lat;userLng=lng;
@@ -533,7 +448,7 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
 
   if(!userMarker){
     userMarker=L.marker([lat,lng],{
-      icon:L.divIcon({className:'nav-marker-wrap',html:CURSOR,iconSize:[40,46],iconAnchor:[20,23]}),
+      icon:L.divIcon({className:'nav-wrap',html:`<div class="nav-glow"></div>${CURSOR}`,iconSize:[38,44],iconAnchor:[19,22]}),
       zIndexOffset:1000,interactive:false
     }).addTo(map);
     accuracyCircle=L.circle([lat,lng],{radius:Math.min(accuracy||20,120),fillColor:'rgba(0,188,212,0.06)',fillOpacity:1,color:'rgba(0,188,212,0.2)',weight:1}).addTo(map);
@@ -542,11 +457,21 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
     userMarker.setLatLng([lat,lng]);
     accuracyCircle.setLatLng([lat,lng]).setRadius(Math.min(accuracy||20,120));
   }
-  setMapBearing(-curH);
+  if(navActive){
+    // WAZE MODE: Map rotates, cursor ALWAYS points UP
+    setMapBearing(-curH);
+    const cEl=document.querySelector('.nav-wrap svg');
+    if(cEl) cEl.style.transform=`rotate(${curH}deg)`;
+  } else {
+    // NORMAL MODE: Map stays north-up, cursor rotates to show heading
+    setMapBearing(0);
+    const cEl=document.querySelector('.nav-wrap svg');
+    if(cEl) cEl.style.transform=`rotate(${curH}deg)`;
+  }
   if(isFollowing&&userLat){
     map.panTo(getOffsetCenter(lat,lng),{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
   }
-  if(navActive&&navTarget){updateNavInfo();checkRouteDeviation(lat,lng);}
+  if(navActive&&navTarget)updateNavInfo();
 }
 
 function recenter(){
@@ -707,36 +632,17 @@ function updateFloatingButtons(){
   }
 }
 
-// Helper: calcula el LatLng que debe ser el centro del mapa para que el cursor
-// aparezca centrado horizontalmente y al 75% del área visible sobre la barra.
-// Leaflet NO sabe de la rotación CSS — sus coordenadas son espacio no-rotado.
-// El truco: el offset visual deseado en pantalla se rota al espacio Leaflet (+curH).
+// Helper: calcula la LatLng objetivo para que el cursor quede al 75% del área visible
 function getOffsetCenter(lat,lng){
   const bar=document.getElementById('bottomBar');
   const barH=bar?bar.offsetHeight:0;
   const mapH=map.getContainer().offsetHeight;
-  const mapW=map.getContainer().offsetWidth;
-
-  // Offset deseado desde el centro geométrico del mapa al punto destino del cursor,
-  // expresado en píxeles de PANTALLA (espacio visual rotado).
-  // dxScreen=0: cursor siempre centrado horizontalmente.
-  // dyScreen: cursor a 75% del área visible, medido desde el centro del mapa.
-  const visibleH=mapH-barH;
-  const dxScreen=0;
-  const dyScreen=(visibleH*0.75)-(mapH/2);
-
-  // Rotar el offset de pantalla al espacio Leaflet (inverso de la rotación CSS -curH).
-  // CSS aplica rotate(-curH), así que el espacio Leaflet está girado +curH respecto a pantalla.
-  const rad=curH*Math.PI/180;
-  const dxLeaflet= dxScreen*Math.cos(rad)-dyScreen*Math.sin(rad);
-  const dyLeaflet= dxScreen*Math.sin(rad)+dyScreen*Math.cos(rad);
-
-  // El centro Leaflet que hace que el cursor quede en el destino visual:
+  const visibleH=mapH-barH; // área libre sobre la barra
+  const targetY=visibleH*0.75; // 75% del área visible
   const cursorPt=map.latLngToContainerPoint([lat,lng]);
-  return map.containerPointToLatLng(L.point(
-    cursorPt.x - dxLeaflet,
-    cursorPt.y - dyLeaflet
-  ));
+  const offsetY=targetY-cursorPt.y;
+  const centerPt=map.latLngToContainerPoint(map.getCenter());
+  return map.containerPointToLatLng(L.point(centerPt.x,centerPt.y-offsetY));
 }
 // Observer para detectar cambios de altura en la barra
 const _barObs=new ResizeObserver(()=>updateFloatingButtons());
@@ -771,237 +677,54 @@ function openWaze(){if(!selectedClient)return;closePopup();if(window.Android?.op
 function openGoogleMaps(){if(!selectedClient)return;closePopup();if(window.Android?.openGoogleMaps)window.Android.openGoogleMaps(selectedClient.lat,selectedClient.lng);else window.open(`https://www.google.com/maps/dir/?api=1&destination=${selectedClient.lat},${selectedClient.lng}`,'_blank');}
 
 // ═══ RUTA ═══
-
-// ── Caché en memoria para la sesión actual ──
-const routeMemCache={};
-function routeCacheKey(oLat,oLng,dLat,dLng){
-  return `${oLat.toFixed(3)},${oLng.toFixed(3)}→${dLat.toFixed(3)},${dLng.toFixed(3)}`;
-}
-
-// ── Spinner de carga ──
-let routeSpinnerInterval=null;
-function startRouteSpinner(){
-  stopRouteSpinner();
-  const msgs=['⏳ Buscando ruta por calles...','⏳ Consultando servidor...','⏳ Calculando mejor camino...'];
-  let i=0;
-  document.getElementById('routeInfo').textContent=msgs[0];
-  routeSpinnerInterval=setInterval(()=>{
-    i=(i+1)%msgs.length;
-    if(navTarget)document.getElementById('routeInfo').textContent=msgs[i];
-  },1800);
-}
-function stopRouteSpinner(){
-  if(routeSpinnerInterval){clearInterval(routeSpinnerInterval);routeSpinnerInterval=null;}
-}
-
 function startRoutePreview(){
   if(!selectedClient||!userLat)return;
   navTarget=selectedClient;closePopup();
   document.getElementById('routeSheet').classList.add('active');
+  document.getElementById('routeEta').textContent='...';
+  document.getElementById('routeDist').textContent='';
   document.getElementById('routeName').textContent=`Hacia ${navTarget.nombre||'cliente'}`;
-
-  const dist=hav(userLat,userLng,navTarget.lat,navTarget.lng);
-  const distEstStr=dist<1?`${Math.round(dist*1000)} m`:`${dist.toFixed(1)} km`;
-
-  // Caché en memoria → respuesta instantánea
-  const memKey=routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
-  if(routeMemCache[memKey]){onRouteResult(routeMemCache[memKey]);return;}
-
-  // Sin caché: línea de referencia punteada + spinner
-  document.getElementById('routeEta').textContent='--';
-  document.getElementById('routeDist').textContent=`~${distEstStr}`;
-  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
-  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
-  routeLine=L.polyline([[userLat,userLng],[navTarget.lat,navTarget.lng]],{
-    color:'rgba(123,47,190,0.35)',weight:3,opacity:1,dashArray:'6,8',lineJoin:'round'
-  }).addTo(map);
+  document.getElementById('routeInfo').textContent='Calculando mejor ruta...';
   map.flyToBounds(L.latLngBounds([[userLat,userLng],[navTarget.lat,navTarget.lng]]),{padding:[80,120],duration:0.8});
-  startRouteSpinner();
   fetchRoute();
 }
+function cancelRoute(){document.getElementById('routeSheet').classList.remove('active');if(routeLine){map.removeLayer(routeLine);routeLine=null;}if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}navTarget=null;document.getElementById('searchPanel').style.display='';}
 
-function cancelRoute(){
-  stopRouteSpinner();
-  document.getElementById('routeSheet').classList.remove('active');
-  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
-  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
-  navTarget=null;
-  document.getElementById('searchPanel').style.display='';
-}
-
-// ── API KEY HERE ──
-const HERE_API_KEY='bp9CrOOFGtH2QV8nEoJHykN9wCKTo3tJ9vbeJ0JDRHE';
-
-// ── Función central que intenta HERE primero, luego OSRM como fallback ──
-async function callRoutingAPI(oLat,oLng,dLat,dLng){
-  // 1️⃣ HERE Routing API v8 (tráfico real, mapas actualizados)
-  if(HERE_API_KEY!=='TU_API_KEY_HERE'){
-    try{
-      const ctrl=new AbortController();
-      const timer=setTimeout(()=>ctrl.abort(),7000);
-      const url=`https://router.hereapi.com/v8/routes?transportMode=car&origin=${oLat},${oLng}&destination=${dLat},${dLng}&return=polyline,summary,actions,instructions&apikey=${HERE_API_KEY}`;
-      const r=await fetch(url,{signal:ctrl.signal});
-      clearTimeout(timer);
-      if(r.ok){
-        const d=await r.json();
-        if(d.routes?.[0]){
-          // Convertir formato HERE → formato OSRM-compatible para onRouteResult
-          return convertHEREtoOSRM(d);
-        }
-      }
-    }catch(e){console.warn('HERE falló, usando OSRM:',e.message);}
-  }
-
-  // 2️⃣ OSRM principal (fallback)
-  // 3️⃣ OSRM mirror (fallback secundario)
+async function fetchRoute(){
+  if(window.Android?.fetchRoute){window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);return;}
   const servers=['https://router.project-osrm.org','https://routing.openstreetmap.de/routed-car'];
   for(const s of servers){
     try{
-      const ctrl=new AbortController();
-      const timer=setTimeout(()=>ctrl.abort(),6000);
-      const r=await fetch(`${s}/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson&steps=true`,{signal:ctrl.signal});
-      clearTimeout(timer);
+      const r=await fetch(`${s}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(8000)});
       if(!r.ok)continue;
       const d=await r.json();
-      if(d.routes?.[0])return d;
+      if(d.routes?.[0]){onRouteResult(d);return;}
     }catch(e){continue;}
   }
-  return null; // todo falló
+  document.getElementById('routeEta').textContent='--';
+  document.getElementById('routeName').textContent='No se pudo calcular la ruta';
 }
-
-// ── Conversor HERE v8 → formato OSRM (para reusar onRouteResult sin cambios) ──
-function convertHEREtoOSRM(hereData){
-  const route=hereData.routes[0];
-  const section=route.sections[0];
-
-  // Decodificar polyline HERE (formato flexible-polyline)
-  const coords=decodeHEREPolyline(section.polyline);
-
-  // Construir steps compatibles con OSRM
-  const steps=(section.actions||[]).map(a=>({
-    name:a.nextRoad?.name?.[0]?.value||'',
-    distance:a.length||0,
-    duration:a.duration||0
-  }));
-
-  return {
-    routes:[{
-      distance:section.summary.length,
-      duration:section.summary.duration,
-      geometry:{type:'LineString',coordinates:coords.map(c=>[c[1],c[0]])},
-      legs:[{steps}]
-    }]
-  };
-}
-
-// ── Decodificador de HERE Flexible Polyline ──
-function decodeHEREPolyline(encoded){
-  // Implementación del algoritmo HERE flexible-polyline
-  const result=[];
-  let i=0,lat=0,lng=0;
-  const len=encoded.length;
-  const TABLE='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-
-  function decodeVal(){
-    let delta=0,shift=0,c;
-    do{
-      c=TABLE.indexOf(encoded[i++]);
-      delta|=(c&0x1F)<<shift;
-      shift+=5;
-    }while(c>=0x20);
-    return (delta&1)?~(delta>>1):(delta>>1);
-  }
-
-  // Saltar header (version + precision)
-  const version=TABLE.indexOf(encoded[i++]);
-  const headerWords=TABLE.indexOf(encoded[i++]);
-  const precision=TABLE.indexOf(encoded[i++])&15;
-  const factor=Math.pow(10,precision);
-  // Saltar campos extra del header si los hay
-  for(let h=0;h<(headerWords-1);h++)i++;
-
-  while(i<len){
-    lat+=decodeVal();
-    lng+=decodeVal();
-    result.push([lat/factor,lng/factor]);
-  }
-  return result;
-}
-
-async function fetchRoute(){
-  if(!navTarget||!userLat)return;
-  if(window.Android?.fetchRoute){window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);return;}
-  const data=await callRoutingAPI(userLat,userLng,navTarget.lat,navTarget.lng);
-  if(data){
-    const key=routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
-    routeMemCache[key]=data;
-    onRouteResult(data);
-  }else{
-    onRouteError();
-  }
-}
-
 function onRouteResult(data){
   if(typeof data==='string')data=JSON.parse(data);
   if(!data.routes?.[0])return;
-  if(!navTarget)return;
-  stopRouteSpinner();
-
   const route=data.routes[0];
   const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
-  _routeCoords=coords; // para detección de desvío
-
-  // Guardar en caché
-  if(userLat&&navTarget){
-    const key=routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
-    routeMemCache[key]=data;
-  }
-
-  // Fade out línea de referencia → dibujar ruta morada real
-  const oldLine=routeLine;
-  const oldBg=window._routeLineBg;
-  routeLine=null;window._routeLineBg=null;
-  [oldLine,oldBg].forEach(l=>{
-    if(!l)return;
-    let op=0.9;
-    const fade=setInterval(()=>{
-      op-=0.15;try{l.setStyle({opacity:Math.max(0,op)});}catch(e){}
-      if(op<=0){clearInterval(fade);try{map.removeLayer(l);}catch(e){}}
-    },40);
-  });
-
-  setTimeout(()=>{
-    if(!navTarget)return;
-    // Fondo morado claro
-    window._routeLineBg=L.polyline(coords,{color:'#C9A0F0',weight:12,opacity:0,lineJoin:'round',lineCap:'round'}).addTo(map);
-    // Línea principal morada
-    routeLine=L.polyline(coords,{color:'#7B2FBE',weight:7,opacity:0,lineJoin:'round',lineCap:'round'}).addTo(map);
-    // Fade in
-    let op=0;
-    const fadeIn=setInterval(()=>{
-      op+=0.15;
-      if(routeLine)routeLine.setStyle({opacity:Math.min(0.95,op)});
-      if(window._routeLineBg)window._routeLineBg.setStyle({opacity:Math.min(0.45,op*0.5)});
-      if(op>=0.95)clearInterval(fadeIn);
-    },40);
-    map.flyToBounds(L.latLngBounds(coords),{padding:[40,60],maxZoom:17,duration:0.8});
-  },250);
-
+  if(routeLine)map.removeLayer(routeLine);
+  routeLine=L.polyline(coords,{color:'#7B2FBE',weight:7,opacity:0.9,lineJoin:'round',lineCap:'round'}).addTo(map);
+  // Background glow line
+  if(window._routeLineBg) map.removeLayer(window._routeLineBg);
+  window._routeLineBg=L.polyline(coords,{color:'#C9A0F0',weight:13,opacity:0.4,lineJoin:'round',lineCap:'round'}).addTo(map);
+  if(routeLine) routeLine.bringToFront();
   const km=route.distance/1000,min=Math.round(route.duration/60);
   document.getElementById('routeEta').textContent=`${min} min`;
   document.getElementById('routeDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
   const roads=(route.legs?.[0]?.steps||[]).filter(s=>s.name&&s.name.length>3&&s.distance>300).map(s=>s.name);
   document.getElementById('routeName').textContent=[...new Set(roads)].slice(0,2).join(' · ')||`Hacia ${navTarget.nombre||'cliente'}`;
-  document.getElementById('routeInfo').textContent='✅ Mejor ruta · Tráfico habitual';
+  document.getElementById('routeInfo').textContent='Mejor ruta · Tráfico habitual';
+  map.flyToBounds(L.latLngBounds(coords),{padding:[60,100],duration:0.8});
 }
 function onRouteResultFromAndroid(){try{if(window._routeJson)onRouteResult(window._routeJson);}catch(e){}}
-function onRouteError(){
-  stopRouteSpinner();
-  if(navTarget){
-    document.getElementById('routeInfo').textContent='📵 Sin conexión · Conectate para ver la ruta';
-    document.getElementById('routeEta').textContent='--';
-  }
-}
+
 function startActiveNav(){
   navActive=true;
   document.getElementById('routeSheet').classList.remove('active');
@@ -1009,7 +732,7 @@ function startActiveNav(){
   collapseSearchPanel();
   document.getElementById('navPanel').classList.add('active');
   isFollowing=true;
-  map.flyTo([userLat,userLng],19,{duration:0.8});
+  map.flyTo([userLat,userLng],18,{duration:0.8});
   updateNavInfo();
 }
 function updateNavInfo(){
@@ -1027,10 +750,9 @@ function updateNavInfo(){
 }
 function stopNavigation(){
   navActive=false;navTarget=null;
-  if(_recalcTimer){clearTimeout(_recalcTimer);_recalcTimer=null;}
-  _routeCoords=[];
   if(routeLine){map.removeLayer(routeLine);routeLine=null;}
   if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
+  setMapBearing(0); // Reset to north-up
   document.getElementById('navTop').classList.remove('active');
   document.getElementById('navPanel').classList.remove('active');
   document.getElementById('routeSheet').classList.remove('active');
@@ -1038,116 +760,7 @@ function stopNavigation(){
   isFollowing=true;recenter();
 }
 
-// ═══ RECÁLCULO AUTOMÁTICO ═══
-let _recalcTimer=null;
-let _routeCoords=[];      // coords actuales de la ruta [[lat,lng],...]
-const RECALC_DIST_M=60;   // metros de desvío para disparar recálculo
-const RECALC_DELAY_MS=5000; // esperar 5s de desvío continuo antes de recalcular
-
-// Distancia mínima de un punto a un segmento de polyline (en metros)
-function distToRoute(lat,lng,coords){
-  if(!coords||coords.length<2)return Infinity;
-  let minD=Infinity;
-  for(let i=0;i<coords.length-1;i++){
-    const d=distPtSeg(lat,lng,coords[i][0],coords[i][1],coords[i+1][0],coords[i+1][1]);
-    if(d<minD)minD=d;
-  }
-  return minD;
-}
-function distPtSeg(px,py,ax,ay,bx,by){
-  // Proyección del punto P sobre el segmento AB, retorna distancia en metros
-  const R=6371000;
-  const toR=d=>d*Math.PI/180;
-  const dx=bx-ax,dy=by-ay;
-  if(dx===0&&dy===0)return hav(px,py,ax,ay)*1000;
-  const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy)));
-  return hav(px,py,ax+t*dx,ay+t*dy)*1000;
-}
-
-function checkRouteDeviation(lat,lng){
-  if(!navActive||!navTarget||!_routeCoords.length)return;
-  const d=distToRoute(lat,lng,_routeCoords);
-  if(d>RECALC_DIST_M){
-    if(!_recalcTimer){
-      _recalcTimer=setTimeout(()=>{
-        _recalcTimer=null;
-        if(navActive&&navTarget){
-          // Mostrar indicador
-          document.getElementById('navTopStreet').textContent='Recalculando ruta...';
-          document.getElementById('turnBox').textContent='🔄';
-          recalcRoute();
-        }
-      },RECALC_DELAY_MS);
-    }
-  } else {
-    // Está en la ruta — cancelar timer si existía
-    if(_recalcTimer){clearTimeout(_recalcTimer);_recalcTimer=null;}
-  }
-}
-
-async function recalcRoute(){
-  if(!navTarget||!userLat)return;
-  if(window.Android?.fetchRoute){
-    window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);
-    return;
-  }
-  const data=await callRoutingAPI(userLat,userLng,navTarget.lat,navTarget.lng);
-  if(data){
-    applyRecalcRoute(data);
-  }else{
-    // Si falló todo, restaurar texto
-    if(navTarget){
-      document.getElementById('navTopStreet').textContent=navTarget.nombre||'';
-      document.getElementById('turnBox').textContent='↑';
-    }
-  }
-}
-
-function applyRecalcRoute(data){
-  if(!data.routes?.[0])return;
-  const route=data.routes[0];
-  const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
-  _routeCoords=coords;
-
-  // Guardar en caché
-  if(userLat&&navTarget){
-    const key=routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
-    routeMemCache[key]=data;
-  }
-
-  // Fade out líneas anteriores
-  const oldLine=routeLine,oldBg=window._routeLineBg;
-  routeLine=null;window._routeLineBg=null;
-  [oldLine,oldBg].forEach(l=>{
-    if(!l)return;
-    let op=0.9;
-    const fade=setInterval(()=>{
-      op-=0.15;try{l.setStyle({opacity:Math.max(0,op)});}catch(e){}
-      if(op<=0){clearInterval(fade);try{map.removeLayer(l);}catch(e){}}
-    },40);
-  });
-
-  setTimeout(()=>{
-    if(!navTarget)return;
-    window._routeLineBg=L.polyline(coords,{color:'#C9A0F0',weight:12,opacity:0,lineJoin:'round',lineCap:'round'}).addTo(map);
-    routeLine=L.polyline(coords,{color:'#7B2FBE',weight:7,opacity:0,lineJoin:'round',lineCap:'round'}).addTo(map);
-    let op=0;
-    const fadeIn=setInterval(()=>{
-      op+=0.15;
-      if(routeLine)routeLine.setStyle({opacity:Math.min(0.95,op)});
-      if(window._routeLineBg)window._routeLineBg.setStyle({opacity:Math.min(0.45,op*0.5)});
-      if(op>=0.95)clearInterval(fadeIn);
-    },40);
-  },250);
-
-  const km=route.distance/1000,min=Math.round(route.duration/60);
-  document.getElementById('navTopDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
-  document.getElementById('navRemainTime').textContent=min<60?`${min} min`:`${Math.floor(min/60)}h ${min%60}m`;
-  document.getElementById('navRemainDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
-  const roads=(route.legs?.[0]?.steps||[]).filter(s=>s.name&&s.name.length>3&&s.distance>300).map(s=>s.name);
-  document.getElementById('navTopStreet').textContent=[...new Set(roads)].slice(0,2).join(' · ')||navTarget.nombre||'';
-  document.getElementById('turnBox').textContent='↑';
-}
+// ═══ MENÚ ═══
 function toggleMenu(){const w=document.getElementById('menuWrap');w.style.display=w.style.display==='block'?'none':'block';}
 function closeMenu(){document.getElementById('menuWrap').style.display='none';}
 function reportAlert(){}

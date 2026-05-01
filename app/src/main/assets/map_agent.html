@@ -677,6 +677,9 @@ function openWaze(){if(!selectedClient)return;closePopup();if(window.Android?.op
 function openGoogleMaps(){if(!selectedClient)return;closePopup();if(window.Android?.openGoogleMaps)window.Android.openGoogleMaps(selectedClient.lat,selectedClient.lng);else window.open(`https://www.google.com/maps/dir/?api=1&destination=${selectedClient.lat},${selectedClient.lng}`,'_blank');}
 
 // ═══ RUTA ═══
+let routeCache={};
+function routeCacheKey(la1,lo1,la2,lo2){return `${la1.toFixed(3)},${lo1.toFixed(3)}-${la2.toFixed(3)},${lo2.toFixed(3)}`;}
+
 function startRoutePreview(){
   if(!selectedClient||!userLat)return;
   navTarget=selectedClient;closePopup();
@@ -685,17 +688,39 @@ function startRoutePreview(){
   document.getElementById('routeDist').textContent='';
   document.getElementById('routeName').textContent=`Hacia ${navTarget.nombre||'cliente'}`;
   document.getElementById('routeInfo').textContent='Calculando mejor ruta...';
+
+  // Línea temporal recta mientras carga la ruta real
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
+  routeLine=L.polyline([[userLat,userLng],[navTarget.lat,navTarget.lng]],{
+    color:'#7B2FBE',weight:5,opacity:0.4,dashArray:'8,10',lineJoin:'round',lineCap:'round'
+  }).addTo(map);
+
   map.flyToBounds(L.latLngBounds([[userLat,userLng],[navTarget.lat,navTarget.lng]]),{padding:[80,120],duration:0.8});
   fetchRoute();
 }
-function cancelRoute(){document.getElementById('routeSheet').classList.remove('active');if(routeLine){map.removeLayer(routeLine);routeLine=null;}if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}navTarget=null;document.getElementById('searchPanel').style.display='';}
+function cancelRoute(){
+  document.getElementById('routeSheet').classList.remove('active');
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
+  navTarget=null;document.getElementById('searchPanel').style.display='';
+}
 
 async function fetchRoute(){
+  if(!navTarget)return;
+  const cacheKey=routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
+  if(routeCache[cacheKey]){
+    onRouteResult(routeCache[cacheKey]);
+    return;
+  }
   if(window.Android?.fetchRoute){window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);return;}
-  const servers=['https://router.project-osrm.org','https://routing.openstreetmap.de/routed-car'];
+  const servers=[
+    'https://router.project-osrm.org',
+    'https://routing.openstreetmap.de/routed-car'
+  ];
   for(const s of servers){
     try{
-      const r=await fetch(`${s}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(8000)});
+      const r=await fetch(`${s}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(12000)});
       if(!r.ok)continue;
       const d=await r.json();
       if(d.routes?.[0]){onRouteResult(d);return;}
@@ -703,25 +728,60 @@ async function fetchRoute(){
   }
   document.getElementById('routeEta').textContent='--';
   document.getElementById('routeName').textContent='No se pudo calcular la ruta';
+  document.getElementById('routeInfo').textContent='Usá Waze o Google Maps';
 }
+
 function onRouteResult(data){
   if(typeof data==='string')data=JSON.parse(data);
   if(!data.routes?.[0])return;
+  if(!navTarget)return;
+
   const route=data.routes[0];
   const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
-  if(routeLine)map.removeLayer(routeLine);
-  routeLine=L.polyline(coords,{color:'#7B2FBE',weight:7,opacity:0.9,lineJoin:'round',lineCap:'round'}).addTo(map);
-  // Background glow line
-  if(window._routeLineBg) map.removeLayer(window._routeLineBg);
-  window._routeLineBg=L.polyline(coords,{color:'#C9A0F0',weight:13,opacity:0.4,lineJoin:'round',lineCap:'round'}).addTo(map);
-  if(routeLine) routeLine.bringToFront();
+
+  // Cache
+  if(userLat&&navTarget){
+    const key=routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
+    if(!routeCache[key]) routeCache[key]=data;
+  }
+
+  // Fade out temporary line
+  const oldLine=routeLine;
+  const oldBg=window._routeLineBg;
+  routeLine=null;window._routeLineBg=null;
+  if(oldLine){
+    let op=0.75;
+    const fadeOut=setInterval(()=>{
+      op-=0.15;
+      try{oldLine.setStyle({opacity:Math.max(0,op)});}catch(e){}
+      if(op<=0){clearInterval(fadeOut);try{map.removeLayer(oldLine);}catch(e){}}
+    },40);
+  }
+  if(oldBg){try{map.removeLayer(oldBg);}catch(e){}}
+
+  // Fade in real route (purple with glow)
+  setTimeout(()=>{
+    if(!navTarget)return;
+    // Background glow
+    window._routeLineBg=L.polyline(coords,{color:'#C9A0F0',weight:13,opacity:0,lineJoin:'round',lineCap:'round'}).addTo(map);
+    // Main line
+    routeLine=L.polyline(coords,{color:'#7B2FBE',weight:7,opacity:0,lineJoin:'round',lineCap:'round'}).addTo(map);
+    let op=0;
+    const fadeIn=setInterval(()=>{
+      op+=0.12;
+      if(window._routeLineBg) window._routeLineBg.setStyle({opacity:Math.min(0.4,op*0.5)});
+      if(routeLine) routeLine.setStyle({opacity:Math.min(0.92,op)});
+      if(op>=0.92) clearInterval(fadeIn);
+    },40);
+    map.flyToBounds(L.latLngBounds(coords),{padding:[60,100],duration:0.8});
+  },250);
+
   const km=route.distance/1000,min=Math.round(route.duration/60);
   document.getElementById('routeEta').textContent=`${min} min`;
   document.getElementById('routeDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
   const roads=(route.legs?.[0]?.steps||[]).filter(s=>s.name&&s.name.length>3&&s.distance>300).map(s=>s.name);
   document.getElementById('routeName').textContent=[...new Set(roads)].slice(0,2).join(' · ')||`Hacia ${navTarget.nombre||'cliente'}`;
-  document.getElementById('routeInfo').textContent='Mejor ruta · Tráfico habitual';
-  map.flyToBounds(L.latLngBounds(coords),{padding:[60,100],duration:0.8});
+  document.getElementById('routeInfo').textContent='✅ Mejor ruta · Tráfico habitual';
 }
 function onRouteResultFromAndroid(){try{if(window._routeJson)onRouteResult(window._routeJson);}catch(e){}}
 

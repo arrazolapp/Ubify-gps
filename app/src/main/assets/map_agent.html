@@ -452,53 +452,58 @@ function setMapBearing(deg){
 }
 
 // ═══ DRAG CORREGIDO PARA MAPA ROTADO ═══
-// Leaflet mueve el mapa en su espacio interno (no rotado).
-// Cuando el mapa está rotado N grados, un drag hacia arriba en pantalla
-// debe traducirse a un movimiento rotado N grados en el espacio de Leaflet.
-// Solución: deshabilitamos el drag nativo de Leaflet e implementamos el nuestro.
 document.addEventListener('DOMContentLoaded',()=>{
   const container=document.getElementById('map');
 
-  // Des-rotar delta de pantalla → espacio Leaflet
-  function unrotate(dx,dy,deg){
-    const r=deg*Math.PI/180;
-    return{
-      x: dx*Math.cos(r)+dy*Math.sin(r),
-      y:-dx*Math.sin(r)+dy*Math.cos(r)
-    };
+  function unrotate(dx,dy){
+    const r=curH*Math.PI/180;
+    const cos=Math.cos(r),sin=Math.sin(r);
+    return{ x:dx*cos+dy*sin, y:-dx*sin+dy*cos };
   }
 
-  let touch0=null; // primer touch activo
+  let touch0=null;
+  let customDragging=false;
 
   container.addEventListener('touchstart',e=>{
-    if(e.touches.length!==1)return;
+    if(e.touches.length!==1){touch0=null;customDragging=false;return;}
     touch0={x:e.touches[0].clientX,y:e.touches[0].clientY};
+    // Solo tomar control si hay rotación real
+    customDragging=Math.abs(curH)>=1;
+    if(customDragging){
+      // Suspender drag de Leaflet para este gesto
+      map.dragging.disable();
+    }
   },{passive:true});
 
   container.addEventListener('touchmove',e=>{
     if(!touch0||e.touches.length!==1)return;
-    if(Math.abs(curH)<1){touch0={x:e.touches[0].clientX,y:e.touches[0].clientY};return;}
-
     const t=e.touches[0];
     const rawDx=t.clientX-touch0.x;
     const rawDy=t.clientY-touch0.y;
     touch0={x:t.clientX,y:t.clientY};
 
-    // Delta en espacio Leaflet (des-rotar por curH)
-    const d=unrotate(rawDx,rawDy,curH);
+    if(!customDragging)return; // Leaflet maneja solo si no hay rotación
 
-    // Mover el mapa por la diferencia corregida
-    const c=map.getCenter();
-    const px=map.project(c,map.getZoom());
-    map.panTo(map.unproject(L.point(px.x-d.x,px.y-d.y),map.getZoom()),{
-      animate:false,noMoveStart:true
-    });
+    const d=unrotate(rawDx,rawDy);
+    map.panBy([-d.x,-d.y],{animate:false,noMoveStart:true});
+
     isFollowing=false;
     document.getElementById('speedometer').classList.add('recenter-mode');
   },{passive:true});
 
-  container.addEventListener('touchend',()=>{touch0=null;},{passive:true});
+  function onTouchEnd(){
+    touch0=null;
+    if(customDragging){
+      customDragging=false;
+      // Reactivar drag de Leaflet después del gesto
+      map.dragging.enable();
+    }
+  }
+  container.addEventListener('touchend',onTouchEnd,{passive:true});
+  container.addEventListener('touchcancel',onTouchEnd,{passive:true});
 });
+
+
 
 
 

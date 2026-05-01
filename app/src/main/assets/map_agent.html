@@ -749,26 +749,116 @@ function cancelRoute(){
   document.getElementById('searchPanel').style.display='';
 }
 
-async function fetchRoute(){
-  if(!navTarget||!userLat)return;
-  if(window.Android?.fetchRoute){window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);return;}
+// ── API KEY HERE ──
+const HERE_API_KEY='bp9CrOOFGtH2QV8nEoJHykN9wCKTo3tJ9vbeJ0JDRHE';
+
+// ── Función central que intenta HERE primero, luego OSRM como fallback ──
+async function callRoutingAPI(oLat,oLng,dLat,dLng){
+  // 1️⃣ HERE Routing API v8 (tráfico real, mapas actualizados)
+  if(HERE_API_KEY!=='TU_API_KEY_HERE'){
+    try{
+      const ctrl=new AbortController();
+      const timer=setTimeout(()=>ctrl.abort(),7000);
+      const url=`https://router.hereapi.com/v8/routes?transportMode=car&origin=${oLat},${oLng}&destination=${dLat},${dLng}&return=polyline,summary,actions,instructions&apikey=${HERE_API_KEY}`;
+      const r=await fetch(url,{signal:ctrl.signal});
+      clearTimeout(timer);
+      if(r.ok){
+        const d=await r.json();
+        if(d.routes?.[0]){
+          // Convertir formato HERE → formato OSRM-compatible para onRouteResult
+          return convertHEREtoOSRM(d);
+        }
+      }
+    }catch(e){console.warn('HERE falló, usando OSRM:',e.message);}
+  }
+
+  // 2️⃣ OSRM principal (fallback)
+  // 3️⃣ OSRM mirror (fallback secundario)
   const servers=['https://router.project-osrm.org','https://routing.openstreetmap.de/routed-car'];
   for(const s of servers){
     try{
       const ctrl=new AbortController();
       const timer=setTimeout(()=>ctrl.abort(),6000);
-      const r=await fetch(`${s}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`,{signal:ctrl.signal});
+      const r=await fetch(`${s}/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson&steps=true`,{signal:ctrl.signal});
       clearTimeout(timer);
       if(!r.ok)continue;
       const d=await r.json();
-      if(d.routes?.[0]){
-        const key=routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
-        routeMemCache[key]=d;
-        onRouteResult(d);return;
-      }
+      if(d.routes?.[0])return d;
     }catch(e){continue;}
   }
-  onRouteError();
+  return null; // todo falló
+}
+
+// ── Conversor HERE v8 → formato OSRM (para reusar onRouteResult sin cambios) ──
+function convertHEREtoOSRM(hereData){
+  const route=hereData.routes[0];
+  const section=route.sections[0];
+
+  // Decodificar polyline HERE (formato flexible-polyline)
+  const coords=decodeHEREPolyline(section.polyline);
+
+  // Construir steps compatibles con OSRM
+  const steps=(section.actions||[]).map(a=>({
+    name:a.nextRoad?.name?.[0]?.value||'',
+    distance:a.length||0,
+    duration:a.duration||0
+  }));
+
+  return {
+    routes:[{
+      distance:section.summary.length,
+      duration:section.summary.duration,
+      geometry:{type:'LineString',coordinates:coords.map(c=>[c[1],c[0]])},
+      legs:[{steps}]
+    }]
+  };
+}
+
+// ── Decodificador de HERE Flexible Polyline ──
+function decodeHEREPolyline(encoded){
+  // Implementación del algoritmo HERE flexible-polyline
+  const result=[];
+  let i=0,lat=0,lng=0;
+  const len=encoded.length;
+  const TABLE='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+  function decodeVal(){
+    let delta=0,shift=0,c;
+    do{
+      c=TABLE.indexOf(encoded[i++]);
+      delta|=(c&0x1F)<<shift;
+      shift+=5;
+    }while(c>=0x20);
+    return (delta&1)?~(delta>>1):(delta>>1);
+  }
+
+  // Saltar header (version + precision)
+  const version=TABLE.indexOf(encoded[i++]);
+  const headerWords=TABLE.indexOf(encoded[i++]);
+  const precision=TABLE.indexOf(encoded[i++])&15;
+  const factor=Math.pow(10,precision);
+  // Saltar campos extra del header si los hay
+  for(let h=0;h<(headerWords-1);h++)i++;
+
+  while(i<len){
+    lat+=decodeVal();
+    lng+=decodeVal();
+    result.push([lat/factor,lng/factor]);
+  }
+  return result;
+}
+
+async function fetchRoute(){
+  if(!navTarget||!userLat)return;
+  if(window.Android?.fetchRoute){window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);return;}
+  const data=await callRoutingAPI(userLat,userLng,navTarget.lat,navTarget.lng);
+  if(data){
+    const key=routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
+    routeMemCache[key]=data;
+    onRouteResult(data);
+  }else{
+    onRouteError();
+  }
 }
 
 function onRouteResult(data){
@@ -921,17 +1011,16 @@ async function recalcRoute(){
     window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);
     return;
   }
-  const servers=['https://router.project-osrm.org','https://routing.openstreetmap.de/routed-car'];
-  for(const s of servers){
-    try{
-      const r=await fetch(`${s}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(8000)});
-      if(!r.ok)continue;
-      const d=await r.json();
-      if(d.routes?.[0]){applyRecalcRoute(d);return;}
-    }catch(e){continue;}
+  const data=await callRoutingAPI(userLat,userLng,navTarget.lat,navTarget.lng);
+  if(data){
+    applyRecalcRoute(data);
+  }else{
+    // Si falló todo, restaurar texto
+    if(navTarget){
+      document.getElementById('navTopStreet').textContent=navTarget.nombre||'';
+      document.getElementById('turnBox').textContent='↑';
+    }
   }
-  // Si falló, restaurar texto
-  if(navTarget)document.getElementById('navTopStreet').textContent=navTarget.nombre||'';
 }
 
 function applyRecalcRoute(data){

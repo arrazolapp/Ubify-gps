@@ -707,34 +707,62 @@ async function fetchRoute(){
   if(!navTarget)return;
   const cacheKey=routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
   if(routeCache[cacheKey]){
+    console.log('Route from cache');
     onRouteResult(routeCache[cacheKey]);
     return;
   }
-  if(window.Android?.fetchRoute){window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);return;}
+
+  // Try Android bridge first
+  if(window.Android?.fetchRoute){
+    console.log('Fetching route via Android bridge');
+    window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);
+    // Set timeout - if Android doesn't respond in 10s, try OSRM directly
+    setTimeout(()=>{
+      if(!routeLine && navTarget){
+        console.log('Android bridge timeout, trying OSRM...');
+        fetchRouteOSRM();
+      }
+    }, 10000);
+    return;
+  }
+
+  fetchRouteOSRM();
+}
+
+async function fetchRouteOSRM(){
   const servers=[
     'https://router.project-osrm.org',
-    'https://routing.openstreetmap.de/routed-car'
+    'https://routing.openstreetmap.de/routed-car',
+    'https://router.project-osrm.org'  // retry first server
   ];
   for(const s of servers){
     try{
-      const r=await fetch(`${s}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(12000)});
-      if(!r.ok)continue;
+      console.log('Trying OSRM:', s);
+      const url=`${s}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`;
+      const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
+      if(!r.ok){console.log('Server returned',r.status);continue;}
       const d=await r.json();
-      if(d.routes?.[0]){onRouteResult(d);return;}
-    }catch(e){continue;}
+      if(d.routes?.[0]){
+        console.log('Route found! Points:',d.routes[0].geometry.coordinates.length);
+        onRouteResult(d);
+        return;
+      }
+    }catch(e){console.log('OSRM error:',e.message);continue;}
   }
+  console.log('All OSRM servers failed');
   document.getElementById('routeEta').textContent='--';
-  document.getElementById('routeName').textContent='No se pudo calcular la ruta';
-  document.getElementById('routeInfo').textContent='Usá Waze o Google Maps';
+  document.getElementById('routeName').textContent='Sin ruta disponible';
+  document.getElementById('routeInfo').textContent='Usá Waze o Google Maps para navegar';
 }
 
 function onRouteResult(data){
   if(typeof data==='string')data=JSON.parse(data);
-  if(!data.routes?.[0])return;
-  if(!navTarget)return;
+  if(!data.routes?.[0]){console.log('No routes in data');return;}
+  if(!navTarget){console.log('navTarget is null');return;}
 
   const route=data.routes[0];
   const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
+  console.log('Drawing route with',coords.length,'points');
 
   // Cache
   if(userLat&&navTarget){
@@ -746,9 +774,10 @@ function onRouteResult(data){
   if(routeLine){map.removeLayer(routeLine);routeLine=null;}
   if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
 
-  // Dibujar ruta morada directamente
+  // Dibujar ruta morada
   window._routeLineBg=L.polyline(coords,{color:'#C9A0F0',weight:13,opacity:0.4,lineJoin:'round',lineCap:'round'}).addTo(map);
   routeLine=L.polyline(coords,{color:'#7B2FBE',weight:7,opacity:0.9,lineJoin:'round',lineCap:'round'}).addTo(map);
+  console.log('Route drawn successfully');
 
   map.flyToBounds(L.latLngBounds(coords),{padding:[60,100],duration:0.8});
 
@@ -759,7 +788,25 @@ function onRouteResult(data){
   document.getElementById('routeName').textContent=[...new Set(roads)].slice(0,2).join(' · ')||`Hacia ${navTarget.nombre||'cliente'}`;
   document.getElementById('routeInfo').textContent='✅ Mejor ruta · Tráfico habitual';
 }
-function onRouteResultFromAndroid(){try{if(window._routeJson)onRouteResult(window._routeJson);}catch(e){}}
+function onRouteResultFromAndroid(){
+  try{
+    if(window._routeJson){
+      console.log('Route received from Android');
+      onRouteResult(window._routeJson);
+    } else {
+      console.log('Android returned empty route');
+      fetchRouteOSRM(); // Fallback to direct OSRM
+    }
+  }catch(e){
+    console.log('Error processing Android route:',e);
+    fetchRouteOSRM();
+  }
+}
+
+function onRouteError(){
+  console.log('Android bridge route error, trying OSRM directly...');
+  fetchRouteOSRM(); // Fallback: try OSRM from JavaScript
+}
 
 function startActiveNav(){
   navActive=true;

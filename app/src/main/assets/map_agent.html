@@ -667,124 +667,94 @@ function openGoogleMaps(){if(!selectedClient)return;closePopup();if(window.Andro
 
 // ═══ RUTA ═══
 
-// ── Caché de rutas ya calculadas (clave: "lat1,lng1→lat2,lng2" redondeado a 3 decimales) ──
-const routeCache = {};
+// ── Caché en memoria para la sesión actual (Android usa caché en disco) ──
+const routeMemCache = {};
 function routeCacheKey(oLat,oLng,dLat,dLng){
   return `${oLat.toFixed(3)},${oLng.toFixed(3)}→${dLat.toFixed(3)},${dLng.toFixed(3)}`;
 }
 
-// ── Servidores OSRM en orden de prioridad ──
-const OSRM_SERVERS = [
-  'https://router.project-osrm.org',
-  'https://routing.openstreetmap.de/routed-car'
-];
-
-// ── Algoritmo: genera waypoints curvos siguiendo el ángulo de las calles ──
-// Simula una ruta urbana realista usando interpolación con desvíos aleatorios
-// basados en la distancia y orientación de la ruta
-function generateSmartOfflineRoute(oLat,oLng,dLat,dLng){
-  const dist = hav(oLat,oLng,dLat,dLng);
-  const pts = [[oLat,oLng]];
-
-  // Ángulo general de la ruta (bearing)
-  const bearing = Math.atan2(dLng-oLng, dLat-oLat);
-
-  // Número de segmentos según distancia
-  const segments = Math.min(12, Math.max(4, Math.round(dist * 8)));
-
-  // Generar puntos intermedios con desvíos perpendiculares
-  // para simular que la ruta sigue calles (no línea recta)
-  const perpBearing = bearing + Math.PI/2;
-  const maxDesvio = Math.min(dist * 0.18, 0.008); // máximo 18% de la distancia total
-
-  for(let i = 1; i < segments; i++){
-    const t = i / segments;
-    // Interpolación base entre origen y destino
-    const baseLat = oLat + (dLat - oLat) * t;
-    const baseLng = oLng + (dLng - oLng) * t;
-
-    // Desvío perpendicular: curva que simula calles
-    // Usa una función seno para que salga y vuelva al camino
-    const desvioFactor = Math.sin(t * Math.PI) * maxDesvio;
-    // Añadir algo de ruido para que parezca más real
-    const ruido = (Math.random() - 0.5) * maxDesvio * 0.3;
-    const desvio = desvioFactor + ruido;
-
-    pts.push([
-      baseLat + Math.cos(perpBearing) * desvio,
-      baseLng + Math.sin(perpBearing) * desvio
-    ]);
-  }
-  pts.push([dLat,dLng]);
-  return pts;
+// ── Estado del spinner de carga ──
+let routeSpinnerInterval = null;
+function startRouteSpinner(){
+  stopRouteSpinner();
+  const msgs = [
+    '⏳ Buscando ruta por calles...',
+    '⏳ Consultando servidor...',
+    '⏳ Calculando mejor camino...'
+  ];
+  let i = 0;
+  document.getElementById('routeInfo').textContent = msgs[0];
+  routeSpinnerInterval = setInterval(()=>{
+    i = (i+1) % msgs.length;
+    if(navTarget) document.getElementById('routeInfo').textContent = msgs[i];
+  }, 1800);
+}
+function stopRouteSpinner(){
+  if(routeSpinnerInterval){ clearInterval(routeSpinnerInterval); routeSpinnerInterval=null; }
 }
 
 function startRoutePreview(){
   if(!selectedClient||!userLat)return;
-  navTarget=selectedClient;closePopup();
+  navTarget=selectedClient; closePopup();
   document.getElementById('routeSheet').classList.add('active');
   document.getElementById('routeName').textContent=`Hacia ${navTarget.nombre||'cliente'}`;
 
-  // 1. Mostrar INMEDIATAMENTE ruta aproximada por calles (offline)
-  showOfflineRoute();
+  const dist = hav(userLat,userLng,navTarget.lat,navTarget.lng);
+  const distEstStr = dist<1 ? `${Math.round(dist*1000)} m` : `${dist.toFixed(1)} km`;
 
-  // 2. Intentar conseguir ruta real en paralelo
+  // Chequear caché en memoria primero (respuesta instantánea)
+  const memKey = routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
+  if(routeMemCache[memKey]){
+    onRouteResult(routeMemCache[memKey]);
+    return;
+  }
+
+  // Sin caché: mostrar distancia en línea recta y spinner mientras llega
+  document.getElementById('routeEta').textContent = '--';
+  document.getElementById('routeDist').textContent = `~${distEstStr}`;
+  // Dibujar línea recta punteada solo como referencia visual de dirección
+  if(routeLine){ map.removeLayer(routeLine); routeLine=null; }
+  routeLine = L.polyline([[userLat,userLng],[navTarget.lat,navTarget.lng]],{
+    color:'rgba(74,144,217,0.4)', weight:3, opacity:1,
+    dashArray:'6,8', lineJoin:'round'
+  }).addTo(map);
+  map.flyToBounds(
+    L.latLngBounds([[userLat,userLng],[navTarget.lat,navTarget.lng]]),
+    {padding:[80,120], duration:0.8}
+  );
+  startRouteSpinner();
+
+  // Pedir ruta real (Android usa caché en disco si ya la tiene)
   fetchRoute();
 }
 
 function cancelRoute(){
+  stopRouteSpinner();
   document.getElementById('routeSheet').classList.remove('active');
-  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  if(routeLine){ map.removeLayer(routeLine); routeLine=null; }
   navTarget=null;
   document.getElementById('searchPanel').style.display='';
 }
 
-// ── RUTA OFFLINE INMEDIATA (curva simulando calles) ──
-function showOfflineRoute(){
-  if(!navTarget||!userLat)return;
-  const dist=hav(userLat,userLng,navTarget.lat,navTarget.lng);
-  // Tiempo estimado: 25 km/h promedio urbano + factor de tortuosidad
-  const factorCalle = 1.35; // las calles son ~35% más largas que en línea recta
-  const distReal = dist * factorCalle;
-  const minEst=Math.max(1,Math.round((distReal/25)*60));
-  document.getElementById('routeEta').textContent=`~${minEst} min`;
-  document.getElementById('routeDist').textContent=distReal<1?`${Math.round(distReal*1000)} m`:`${distReal.toFixed(1)} km`;
-  document.getElementById('routeName').textContent=`Hacia ${navTarget.nombre||'cliente'}`;
-  document.getElementById('routeInfo').textContent='🛣️ Ruta aproximada · Buscando ruta exacta...';
-
-  // Dibujar ruta aproximada con curvas (simulando calles)
-  if(routeLine)map.removeLayer(routeLine);
-  const pts = generateSmartOfflineRoute(userLat,userLng,navTarget.lat,navTarget.lng);
-  routeLine=L.polyline(pts,{
-    color:'#4a90d9',weight:6,opacity:0.75,
-    lineJoin:'round',lineCap:'round',
-    dashArray:'1,0' // línea sólida pero más suave que la recta punteada
-  }).addTo(map);
-  map.flyToBounds(L.latLngBounds([[userLat,userLng],[navTarget.lat,navTarget.lng]]),{padding:[80,120],duration:0.8});
-}
-
-// ── FETCH RUTA REAL (con timeout corto + caché + múltiples servidores) ──
+// ── FETCH RUTA: delega a Android (que tiene caché en disco) o fallback JS ──
 async function fetchRoute(){
-  if(!navTarget||!userLat)return;
+  if(!navTarget||!userLat) return;
 
-  // Verificar caché primero
-  const cacheKey = routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
-  if(routeCache[cacheKey]){
-    onRouteResult(routeCache[cacheKey]);
-    return;
-  }
-
-  // Delegar a Android nativo si está disponible (evita CORS)
+  // Android nativo: tiene caché persistente en disco y maneja la red sin CORS
   if(window.Android?.fetchRoute){
     window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);
     return;
   }
 
-  // Intentar servidores con timeout agresivo (4s máximo)
-  for(const server of OSRM_SERVERS){
+  // Fallback JS (solo si se usa fuera de la app, ej. navegador para debug)
+  const servers = [
+    'https://router.project-osrm.org',
+    'https://routing.openstreetmap.de/routed-car'
+  ];
+  for(const server of servers){
     try{
-      const ctrl = new AbortController();
-      const timer = setTimeout(()=>ctrl.abort(), 4000);
+      const ctrl  = new AbortController();
+      const timer = setTimeout(()=>ctrl.abort(), 6000);
       const r = await fetch(
         `${server}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`,
         {signal: ctrl.signal}
@@ -793,38 +763,39 @@ async function fetchRoute(){
       if(!r.ok) continue;
       const d = await r.json();
       if(d.routes?.[0]){
-        // Guardar en caché
-        routeCache[cacheKey] = d;
+        const key = routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
+        routeMemCache[key] = d;
         onRouteResult(d);
         return;
       }
-    }catch(e){
-      // timeout o sin internet → continuar con el siguiente servidor
-      continue;
-    }
+    }catch(e){ continue; }
   }
 
-  // Si todos fallaron: la ruta offline ya se está mostrando, solo actualizar texto
-  if(navTarget){ // verificar que no cancelaron mientras esperaba
-    document.getElementById('routeInfo').textContent='🛣️ Ruta aproximada · Sin conexión';
+  // Sin internet y sin caché → informar claramente
+  stopRouteSpinner();
+  if(navTarget){
+    document.getElementById('routeInfo').textContent='📵 Sin conexión · Conectate para ver la ruta';
+    document.getElementById('routeEta').textContent='--';
   }
 }
 
 function onRouteResult(data){
   if(typeof data==='string')data=JSON.parse(data);
   if(!data.routes?.[0])return;
-  if(!navTarget)return; // cancelaron mientras esperaba
+  if(!navTarget)return;
+
+  stopRouteSpinner();
 
   const route=data.routes[0];
   const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
 
-  // Guardar en caché para próximas veces
+  // Guardar en caché de memoria para esta sesión
   if(userLat&&navTarget){
     const key=routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
-    if(!routeCache[key]) routeCache[key]=data;
+    routeMemCache[key]=data;
   }
 
-  // Transición suave: fade out línea offline → fade in ruta real
+  // Transición suave: fade out línea de referencia → fade in ruta real
   const oldLine=routeLine;
   routeLine=null;
   if(oldLine){
@@ -836,8 +807,10 @@ function onRouteResult(data){
     },40);
   }
   setTimeout(()=>{
-    if(!navTarget)return; // cancelaron mientras hacía fade
-    routeLine=L.polyline(coords,{color:'#4a90d9',weight:7,opacity:0,lineJoin:'round',lineCap:'round'}).addTo(map);
+    if(!navTarget)return;
+    routeLine=L.polyline(coords,{
+      color:'#4a90d9',weight:7,opacity:0,lineJoin:'round',lineCap:'round'
+    }).addTo(map);
     let op=0;
     const fadeIn=setInterval(()=>{
       op+=0.15;
@@ -847,14 +820,20 @@ function onRouteResult(data){
     map.flyToBounds(L.latLngBounds(coords),{padding:[60,100],duration:0.8});
   },250);
 
-  const km=route.distance/1000,min=Math.round(route.duration/60);
+  const km=route.distance/1000, min=Math.round(route.duration/60);
   document.getElementById('routeEta').textContent=`${min} min`;
   document.getElementById('routeDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
-  const roads=(route.legs?.[0]?.steps||[]).filter(s=>s.name&&s.name.length>3&&s.distance>300).map(s=>s.name);
-  document.getElementById('routeName').textContent=[...new Set(roads)].slice(0,2).join(' · ')||`Hacia ${navTarget.nombre||'cliente'}`;
+  const roads=(route.legs?.[0]?.steps||[])
+    .filter(s=>s.name&&s.name.length>3&&s.distance>300).map(s=>s.name);
+  document.getElementById('routeName').textContent=
+    [...new Set(roads)].slice(0,2).join(' · ')||`Hacia ${navTarget.nombre||'cliente'}`;
   document.getElementById('routeInfo').textContent='✅ Mejor ruta · Tráfico habitual';
 }
 function onRouteResultFromAndroid(){try{if(window._routeJson)onRouteResult(window._routeJson);}catch(e){}}
+function onRouteError(){
+  stopRouteSpinner();
+  if(navTarget) document.getElementById('routeInfo').textContent='📵 Sin conexión · Conectate para ver la ruta';
+}
 
 function startActiveNav(){
   navActive=true;
